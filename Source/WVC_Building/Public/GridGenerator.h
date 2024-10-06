@@ -8,37 +8,41 @@
 
 class UDebugStrings;
 
-struct Quad
-{
+struct FGridQuad
+{	
+	int Index = -1;
 	FVector Center;
-	FVector Corners[4];
+	TArray<FInt32Point> Points;
+	TArray<int> Neighbours;
+
+	FGridQuad() {}
+
+	FGridQuad(const TArray<FInt32Point>& InPoints, const int InIndex)
+	{
+		Points = InPoints;
+		Index = InIndex;
+	}
 };
 
-USTRUCT(BlueprintType)
 struct FGridTriangle
 {
-	GENERATED_BODY();
-	
-	TArray<FInt32Point> Points;
-
 	int Index = -1;
+	TArray<FInt32Point> Points;
 	TArray<FInt32Point> Neighbours;
+	bool FormsQuad = false;
+	FGridTriangle() {}
 
-	FGridTriangle()
+	FGridTriangle(const TArray<FInt32Point>& InPoints, const int InIndex)
 	{
+		Points = InPoints;
+		Index = InIndex;
 	}
 
-	FGridTriangle(const TArray<FInt32Point>& NPoints, const int NIndex)
+	FGridTriangle(const TArray<FInt32Point>& InPoints, const int InIndex, const TArray<FInt32Point>& InNeighbours)
 	{
-		Points = NPoints;
-		Index = NIndex;
-	}
-
-	FGridTriangle(const TArray<FInt32Point>& NPoints, const int NIndex, const TArray<FInt32Point>& NNeighbours)
-	{
-		Points = NPoints;
-		Index = NIndex;
-		Neighbours = NNeighbours;
+		Points = InPoints;
+		Index = InIndex;
+		Neighbours = InNeighbours;
 	}
 };
 
@@ -59,10 +63,12 @@ protected:
 	
 	TArray<TArray<FVector>> GridCoordinates;
 	//UPROPERTY(BlueprintReadOnly)
-	TArray<TArray<FGridTriangle>> Triangles;
+	TArray<FGridTriangle> Triangles;
+	TArray<FGridQuad> Quads;
 	FVector Center;
 	void GenerateHexCoordinates(const FVector& GridCenter, const float Size, const uint32 Index);
 	void DivideGridIntoTriangles(const FVector& GridCenter);
+	void DivideGridIntoQuads(const FVector& GridCenter);
 public:
 	UPROPERTY(EditAnywhere)
 	float HexSize = 50.f;
@@ -77,5 +83,5 @@ public:
 	UDebugStrings* DebugStringsComp;
 	
 	FVector GetGridCoordinate(const int Hex, const int Coordinate) {return GridCoordinates[Hex][Coordinate];}
-	const TArray<TArray<FGridTriangle>>& GetTriangles() { return Triangles; }
+	const TArray<FGridTriangle>& GetTriangles() { return Triangles; }
 };

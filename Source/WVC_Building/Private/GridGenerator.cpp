@@ -54,15 +54,13 @@ void AGridGenerator::DivideGridIntoTriangles(const FVector& GridCenter)
 	if(!GridCoordinates.Num())
 		return;
 
-	
+	int TriangleIndex = 0;
 	for(int i = 0; i < GridCoordinates.Num() - 1; i++)
 	{
-		TArray<FGridTriangle> TrianglesOnHex;
 		const int SmallMaxCoordinate = GridCoordinates[i].Num();
 		const int LargeMaxCoordinate = GridCoordinates[i + 1].Num();
 		const int TrianglesPerSide = i * 2 + 1;
 		const int NumTriangles = 6 * TrianglesPerSide;
-		int TriangleIndex = 0;
 		for(int j = 0; j < 6; j++)
 		{
 			int SmallCoordinate = j * i;
@@ -98,18 +96,50 @@ void AGridGenerator::DivideGridIntoTriangles(const FVector& GridCenter)
 				if(k % 2 == 0)
 				{
 					if(i + 1 < GridCoordinates.Num() - 1)
-						Neighbours.Add({i + 1, TriangleIndex + j * 2 + 1});
+						Neighbours.Add({i + 1, TriangleIndex + 6 * (2 * i + 1) + 1 + 2 * j});
 				}
-				else if (k % 2 == 1 && i)
+				else
 				{
 					if(i > 0)
-						Neighbours.Add({i - 1, TriangleIndex - j * 2 - 1});
+						Neighbours.Add({i - 1, TriangleIndex - 6 * i + 12 * ((i - 1) * i) / 2 - 1 - 2 * j});
 				}
-				TrianglesOnHex.Emplace(TrianglePoints, TriangleIndex++, Neighbours);
+				Triangles.Emplace(TrianglePoints, TriangleIndex++, Neighbours);
 			}
 		}
-		Triangles.Emplace(TrianglesOnHex);
 	}
+}
+
+void AGridGenerator::DivideGridIntoQuads(const FVector& GridCenter)
+{
+	/*const int NumTriangles = (Triangles.Num() + 1) * 6 + (Triangles.Num() * (Triangles.Num() + 1)) / 2 * 12;
+	int QuadIndex = 0;
+	TArray<FInt32Point> AvailableTriangles;
+	for(int i = 0; i < Triangles.Num(); i++)
+		for(int j = 0; j < Triangles[i].Num(); i++)
+			AvailableTriangles.Add({i, j});
+	while(AvailableTriangles.Num())
+	{
+		int RandomTriangle = FMath::RandRange(0, AvailableTriangles.Num() - 1);
+		FGridTriangle& CurrentTriangle = Triangles[AvailableTriangles[RandomTriangle].X][AvailableTriangles[RandomTriangle].Y]; 
+		TArray<FInt32Point> Neighbours = CurrentTriangle.Neighbours;
+		for(int i = 0; i < Neighbours.Num(); i++)
+		{
+			int RandomNeighbour = FMath::RandRange(0, Neighbours.Num() - 1);
+			FGridTriangle& NeighbourTriangle = Triangles[CurrentTriangle.Neighbours[RandomNeighbour].X][CurrentTriangle.Neighbours[RandomNeighbour].Y]; 
+			if(NeighbourTriangle.FormsQuad)
+				continue;
+			TArray<FInt32Point> QuadPoints;
+			for(int j = 0; j < 3; j++)
+			{
+				QuadPoints.AddUnique(CurrentTriangle.Points[i]);
+				QuadPoints.AddUnique(NeighbourTriangle.Points[i]);
+			}
+			Quads.Add({QuadPoints, QuadIndex++});
+			CurrentTriangle.FormsQuad = true;
+			NeighbourTriangle.FormsQuad = true;
+			AvailableTriangles.RemoveAt(.Num() * 6 + ((Triangles.Num() - 1) * Triangles.Num()) / 2 * 12 + );
+		}
+	}*/
 }
 
 // Called every frame
@@ -133,33 +163,29 @@ void AGridGenerator::OnConstruction(const FTransform& Transform)
 
 	for(int i = 0; i < Triangles.Num(); i++)
 	{
-		for(int j = 0; j < Triangles[i].Num(); j++)
-		{
-			if(Triangles[i][j].Index == -1)
-				continue;
-			FLinearColor Color = FColor::Red;
-			FLinearColor Color2 = FColor::Green;
-			FLinearColor Color3 = FColor::Blue;
-			float LineThickness = 2.f;
-			//if(i != 24)
-			//	continue;
-			DrawDebugLine(GetWorld(), 
-			GetGridCoordinate(Triangles[i][j].Points[0].X, Triangles[i][j].Points[0].Y),
-				GetGridCoordinate(Triangles[i][j].Points[1].X, Triangles[i][j].Points[1].Y),
-				Color.ToFColor(true),
-				true);
-			DrawDebugLine(GetWorld(), 
-			GetGridCoordinate(Triangles[i][j].Points[1].X, Triangles[i][j].Points[1].Y),
-				GetGridCoordinate(Triangles[i][j].Points[2].X, Triangles[i][j].Points[2].Y),
-				Color2.ToFColor(true),
-				true);
-			DrawDebugLine(GetWorld(), 
-			GetGridCoordinate(Triangles[i][j].Points[2].X, Triangles[i][j].Points[2].Y),
-				GetGridCoordinate(Triangles[i][j].Points[0].X, Triangles[i][j].Points[0].Y),
-				Color3.ToFColor(true),
-				true);
-		}
-		
+		if(Triangles[i].Index == -1)
+			continue;
+		FLinearColor Color = FColor::Red;
+		FLinearColor Color2 = FColor::Green;
+		FLinearColor Color3 = FColor::Blue;
+		float LineThickness = 2.f;
+		//if(i != 24)
+		//	continue;
+		DrawDebugLine(GetWorld(), 
+		GetGridCoordinate(Triangles[i].Points[0].X, Triangles[i].Points[0].Y),
+			GetGridCoordinate(Triangles[i].Points[1].X, Triangles[i].Points[1].Y),
+			Color.ToFColor(true),
+			true);
+		DrawDebugLine(GetWorld(), 
+		GetGridCoordinate(Triangles[i].Points[1].X, Triangles[i].Points[1].Y),
+			GetGridCoordinate(Triangles[i].Points[2].X, Triangles[i].Points[2].Y),
+			Color2.ToFColor(true),
+			true);
+		DrawDebugLine(GetWorld(), 
+		GetGridCoordinate(Triangles[i].Points[2].X, Triangles[i].Points[2].Y),
+			GetGridCoordinate(Triangles[i].Points[0].X, Triangles[i].Points[0].Y),
+			Color3.ToFColor(true),
+			true);
 		//DrawDebugString(GetWorld(), TriangleCenter, *FString::Printf(TEXT("T")), nullptr, FColor::Red, 100.f, true, 5.f);
 	}
 }
