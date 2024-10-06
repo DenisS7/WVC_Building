@@ -79,7 +79,7 @@ public:
 	virtual void OnConstruction(const FTransform& Transform) override;
 	void GenerateGrid();
 	
-	int GetTriangleIndexAt(uint32 Hex, uint32 Number) { return Hex * 12 + Number; }
+	int GetFirstTriangleIndexOnHex(const uint32 Hex) { return 6 * Hex * Hex; }
 	UDebugStrings* DebugStringsComp;
 	
 	FVector GetGridCoordinate(const int Hex, const int Coordinate) {return GridCoordinates[Hex][Coordinate];}
