@@ -28,7 +28,7 @@ struct FGridTriangle
 {
 	int Index = -1;
 	TArray<FInt32Point> Points;
-	TArray<FInt32Point> Neighbours;
+	TArray<int> Neighbours;
 	bool FormsQuad = false;
 	FGridTriangle() {}
 
@@ -38,7 +38,7 @@ struct FGridTriangle
 		Index = InIndex;
 	}
 
-	FGridTriangle(const TArray<FInt32Point>& InPoints, const int InIndex, const TArray<FInt32Point>& InNeighbours)
+	FGridTriangle(const TArray<FInt32Point>& InPoints, const int InIndex, const TArray<int>& InNeighbours)
 	{
 		Points = InPoints;
 		Index = InIndex;
