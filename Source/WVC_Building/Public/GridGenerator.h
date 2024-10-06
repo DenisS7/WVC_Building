@@ -22,7 +22,7 @@ struct FGridTriangle
 	TArray<FInt32Point> Points;
 
 	int Index = -1;
-	TArray<int> Neighbours;
+	TArray<FInt32Point> Neighbours;
 
 	FGridTriangle()
 	{
@@ -32,6 +32,13 @@ struct FGridTriangle
 	{
 		Points = NPoints;
 		Index = NIndex;
+	}
+
+	FGridTriangle(const TArray<FInt32Point>& NPoints, const int NIndex, const TArray<FInt32Point>& NNeighbours)
+	{
+		Points = NPoints;
+		Index = NIndex;
+		Neighbours = NNeighbours;
 	}
 };
 
@@ -51,8 +58,8 @@ protected:
 	//FVector GridCoordinates[10][60];
 	
 	TArray<TArray<FVector>> GridCoordinates;
-	UPROPERTY(BlueprintReadOnly)
-	TArray<FGridTriangle> Triangles;
+	//UPROPERTY(BlueprintReadOnly)
+	TArray<TArray<FGridTriangle>> Triangles;
 	FVector Center;
 	void GenerateHexCoordinates(const FVector& GridCenter, const float Size, const uint32 Index);
 	void DivideGridIntoTriangles(const FVector& GridCenter);
@@ -65,9 +72,10 @@ public:
 	virtual void Tick(float DeltaTime) override;
 	virtual void OnConstruction(const FTransform& Transform) override;
 	void GenerateGrid();
-
+	
+	int GetTriangleIndexAt(uint32 Hex, uint32 Number) { return Hex * 12 + Number; }
 	UDebugStrings* DebugStringsComp;
 	
 	FVector GetGridCoordinate(const int Hex, const int Coordinate) {return GridCoordinates[Hex][Coordinate];}
-	const TArray<FGridTriangle>& GetTriangles() { return Triangles; }
+	const TArray<TArray<FGridTriangle>>& GetTriangles() { return Triangles; }
 };
