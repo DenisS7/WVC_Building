@@ -32,7 +32,7 @@ void AGridGenerator::GenerateHexCoordinates(const FVector& GridCenter, const flo
 	
 	for(uint32 i = 0; i < 6; i++)
 	{
-		const float AngleRad = FMath::DegreesToRadians(60.f * i - 30.f);
+		const float AngleRad = FMath::DegreesToRadians(60.f * i - 150.f);
 		HexPoints[i * NextIndex] = FVector(GridCenter.X + Size * FMath::Cos(AngleRad), GridCenter.Y + Size * FMath::Sin(AngleRad), GridCenter.Z);
 	}
 	const float FractionDistanceBetween = 1.f / static_cast<float>(NextIndex);
@@ -42,8 +42,8 @@ void AGridGenerator::GenerateHexCoordinates(const FVector& GridCenter, const flo
 		{
 			const int PointIndex = i * NextIndex + j + 1;
 			const float FractionDist = static_cast<float>(j + 1) * FractionDistanceBetween;
-			HexPoints[PointIndex] = FractionDist * HexPoints[i * NextIndex] +
-												(1.f - FractionDist) * HexPoints[(((i + 1) % 6) * NextIndex)];
+			HexPoints[PointIndex] = FractionDist * HexPoints[(((i + 1) % 6) * NextIndex)] +
+												(1.f - FractionDist) * HexPoints[i * NextIndex];
 		}
 	}
 	GridCoordinates.Emplace(HexPoints);
@@ -116,6 +116,8 @@ void AGridGenerator::OnConstruction(const FTransform& Transform)
 		FLinearColor Color2 = FColor::Green;
 		FLinearColor Color3 = FColor::Blue;
 		float LineThickness = 2.f;
+		//if(i != 24)
+		//	continue;
 		DrawDebugLine(GetWorld(), 
 		GetGridCoordinate(Triangles[i].Points[0].X, Triangles[i].Points[0].Y),
 			GetGridCoordinate(Triangles[i].Points[1].X, Triangles[i].Points[1].Y),
