@@ -69,6 +69,7 @@ protected:
 	void GenerateHexCoordinates(const FVector& GridCenter, const float Size, const uint32 Index);
 	void DivideGridIntoTriangles(const FVector& GridCenter);
 	void DivideGridIntoQuads(const FVector& GridCenter);
+	void SortQuadPoints(FGridQuad& Quad);
 public:
 	UPROPERTY(EditAnywhere)
 	float HexSize = 50.f;
@@ -80,8 +81,9 @@ public:
 	void GenerateGrid();
 	
 	int GetFirstTriangleIndexOnHex(const uint32 Hex) { return 6 * Hex * Hex; }
+	//virtual bool ShouldTickIfViewportsOnly() const override { return true; }
 	UDebugStrings* DebugStringsComp;
-	
 	FVector GetGridCoordinate(const int Hex, const int Coordinate) {return GridCoordinates[Hex][Coordinate];}
 	const TArray<FGridTriangle>& GetTriangles() { return Triangles; }
+	const TArray<FGridQuad>& GetQuads() { return Quads; }
 };

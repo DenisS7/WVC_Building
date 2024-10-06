@@ -66,7 +66,7 @@ FDebugRenderSceneProxy* UDebugStrings::CreateDebugSceneProxy()
 		return DebugSceneProxy;
 	}
 	
-	TArray<FGridTriangle> Triangles = GridGen->GetTriangles();
+	/*TArray<FGridTriangle> Triangles = GridGen->GetTriangles();
 	for(int i = 0; i < Triangles.Num(); i++)
 	{
 
@@ -77,6 +77,21 @@ FDebugRenderSceneProxy* UDebugStrings::CreateDebugSceneProxy()
 			Sum += GridGen->GetGridCoordinate(Triangles[i].Points[k].X, Triangles[i].Points[k].Y);
 		FVector TriangleCenter = Sum / 3.f;
 		ProxyData.DebugLabels.Add({TriangleCenter, FString::FromInt(Triangles[i].Index)});
+		
+		//DrawDebugString(GetWorld(), TriangleCenter, *FString::Printf(TEXT("T")), nullptr, FColor::Red, 100.f, true, 5.f);
+	}*/
+
+	TArray<FGridQuad> Quads = GridGen->GetQuads();
+	for(int i = 0; i < Quads.Num(); i++)
+	{
+
+		if(Quads[i].Index == -1)
+			continue;
+		FVector Sum = FVector::Zero();
+		for(int k = 0; k < 4; k++)
+			Sum += GridGen->GetGridCoordinate(Quads[i].Points[k].X, Quads[i].Points[k].Y);
+		FVector QuadCenter = Sum / 4.f;
+		ProxyData.DebugLabels.Add({QuadCenter, FString::FromInt(Quads[i].Index)});
 		
 		//DrawDebugString(GetWorld(), TriangleCenter, *FString::Printf(TEXT("T")), nullptr, FColor::Red, 100.f, true, 5.f);
 	}

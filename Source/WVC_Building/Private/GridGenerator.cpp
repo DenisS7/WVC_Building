@@ -18,7 +18,6 @@ AGridGenerator::AGridGenerator()
 void AGridGenerator::BeginPlay()
 {
 	Super::BeginPlay();
-	
 }
 
 void AGridGenerator::GenerateHexCoordinates(const FVector& GridCenter, const float Size, const uint32 Index)
@@ -60,7 +59,6 @@ void AGridGenerator::DivideGridIntoTriangles(const FVector& GridCenter)
 		const int SmallMaxCoordinate = GridCoordinates[i].Num();
 		const int LargeMaxCoordinate = GridCoordinates[i + 1].Num();
 		const int TrianglesPerSide = i * 2 + 1;
-		const int NumTriangles = 6 * TrianglesPerSide;
 		for(int j = 0; j < 6; j++)
 		{
 			int SmallCoordinate = j * i;
@@ -94,7 +92,7 @@ void AGridGenerator::DivideGridIntoTriangles(const FVector& GridCenter)
 				}
 				if(j == 0 && k == 0) //first triangle
 				{
-					Neighbours.Add(NumTriangles - 1);
+					Neighbours.Add(GetFirstTriangleIndexOnHex(i + 1) - 1);
 				}
 				else
 				{
@@ -114,7 +112,6 @@ void AGridGenerator::DivideGridIntoTriangles(const FVector& GridCenter)
 			}
 		}
 	}
-	int ok = 0;
 }
 
 void AGridGenerator::DivideGridIntoQuads(const FVector& GridCenter)
@@ -144,6 +141,7 @@ void AGridGenerator::DivideGridIntoQuads(const FVector& GridCenter)
 				QuadPoints.AddUnique(NeighbourTriangle.Points[j]);
 			}
 			Quads.Add({QuadPoints, QuadIndex++});
+			SortQuadPoints(Quads.Last());
 			CurrentTriangle.FormsQuad = true;
 			NeighbourTriangle.FormsQuad = true;
 			AvailableTriangles.RemoveSingle(NeighbourTriangle.Index);
@@ -153,11 +151,44 @@ void AGridGenerator::DivideGridIntoQuads(const FVector& GridCenter)
 	}
 }
 
+void AGridGenerator::SortQuadPoints(FGridQuad& Quad)
+{
+	FVector QuadCenter = FVector::ZeroVector;
+	for(int i = 0; i < Quad.Points.Num(); i++)
+		QuadCenter += GetGridCoordinate(Quad.Points[i].X, Quad.Points[i].Y);
+	QuadCenter /= 4.f;
+	struct FPointAngle
+	{
+		int Index;
+		float Angle;
+
+		FPointAngle(const int InIndex, const float InAngle)
+		{
+			Index = InIndex;
+			Angle = InAngle;
+		}
+	};
+	TArray<FPointAngle> Angles;
+	for(int i = 0; i < Quad.Points.Num(); i++)
+	{
+		const FVector GridCoordinate = GetGridCoordinate(Quad.Points[i].X, Quad.Points[i].Y);
+		Angles.Add(FPointAngle(i, FMath::Atan2(GridCoordinate.Y - QuadCenter.Y, GridCoordinate.X - QuadCenter.X)));
+	}
+	Angles.Sort([](const FPointAngle& A, const FPointAngle& B)
+	{
+		return A.Angle < B.Angle; // Counterclockwise sorting
+	});
+	const TArray<FIntPoint> CopyPoints = Quad.Points;
+	for(int i = 0; i < Quad.Points.Num(); i++)
+	{
+		Quad.Points[i] = CopyPoints[Angles[i].Index];
+	}
+}
+
 // Called every frame
 void AGridGenerator::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
-
 }
 
 void AGridGenerator::OnConstruction(const FTransform& Transform)
@@ -239,6 +270,7 @@ void AGridGenerator::GenerateGrid()
 {
 	GridCoordinates.Empty();
 	Triangles.Empty();
+	Quads.Empty();
 	Center = GetActorLocation();
 	GridCoordinates.Emplace(TArray<FVector>{Center});
 	for(uint32 i = 0; i < GridSize; i++)
@@ -248,4 +280,3 @@ void AGridGenerator::GenerateGrid()
 	DivideGridIntoTriangles(Center);
 	DivideGridIntoQuads(Center);
 }
-

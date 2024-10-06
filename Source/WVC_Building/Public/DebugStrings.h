@@ -51,6 +51,7 @@ class WVC_BUILDING_API UDebugStrings : public UDebugDrawComponent
 	virtual FDebugRenderSceneProxy* CreateDebugSceneProxy() override;
 	virtual FDebugDrawDelegateHelper& GetDebugDrawDelegateHelper() override { return DebugDrawDelegateManager; }
 	virtual FBoxSphereBounds CalcBounds(const FTransform& LocalToWorld) const override;
+	virtual bool ShouldRecreateProxyOnUpdateTransform() const override { return true; }
 
 	FDebugTextDelegateHelper DebugDrawDelegateManager;
 };
