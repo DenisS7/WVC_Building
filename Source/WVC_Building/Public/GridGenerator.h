@@ -22,6 +22,7 @@ struct FGridQuad
 		Points = InPoints;
 		Index = InIndex;
 	}
+	
 };
 
 struct FGridTriangle
@@ -31,7 +32,7 @@ struct FGridTriangle
 	TArray<int> Neighbours;
 	bool FormsQuad = false;
 	FGridTriangle() {}
-
+	
 	FGridTriangle(const TArray<int>& InPoints, const int InIndex)
 	{
 		Points = InPoints;
@@ -66,6 +67,7 @@ protected:
 	//UPROPERTY(BlueprintReadOnly)
 	TArray<FGridTriangle> Triangles;
 	TArray<FGridQuad> Quads;
+	TArray<FGridQuad> FinalQuads;
 	FVector Center;
 	void GenerateHexCoordinates(const FVector& GridCenter, const float Size, const uint32 Index);
 	void DivideGridIntoTriangles(const FVector& GridCenter);
@@ -92,4 +94,5 @@ public:
 	const TArray<FGridTriangle>& GetTriangles() { return Triangles; }
 	const TArray<FGridQuad>& GetQuads() { return Quads; }
 	const TArray<FVector>& GetGridPoints() { return GridPoints; }
+	const TArray<FGridQuad>& GetFinalQuads() { return FinalQuads; }
 };
