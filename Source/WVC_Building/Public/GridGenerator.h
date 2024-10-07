@@ -12,12 +12,12 @@ struct FGridQuad
 {	
 	int Index = -1;
 	FVector Center;
-	TArray<FInt32Point> Points;
+	TArray<int> Points;
 	TArray<int> Neighbours;
 
 	FGridQuad() {}
 
-	FGridQuad(const TArray<FInt32Point>& InPoints, const int InIndex)
+	FGridQuad(const TArray<int>& InPoints, const int InIndex)
 	{
 		Points = InPoints;
 		Index = InIndex;
@@ -27,18 +27,18 @@ struct FGridQuad
 struct FGridTriangle
 {
 	int Index = -1;
-	TArray<FInt32Point> Points;
+	TArray<int> Points;
 	TArray<int> Neighbours;
 	bool FormsQuad = false;
 	FGridTriangle() {}
 
-	FGridTriangle(const TArray<FInt32Point>& InPoints, const int InIndex)
+	FGridTriangle(const TArray<int>& InPoints, const int InIndex)
 	{
 		Points = InPoints;
 		Index = InIndex;
 	}
 
-	FGridTriangle(const TArray<FInt32Point>& InPoints, const int InIndex, const TArray<int>& InNeighbours)
+	FGridTriangle(const TArray<int>& InPoints, const int InIndex, const TArray<int>& InNeighbours)
 	{
 		Points = InPoints;
 		Index = InIndex;
@@ -61,7 +61,8 @@ protected:
 	//
 	//FVector GridCoordinates[10][60];
 	
-	TArray<TArray<FVector>> GridCoordinates;
+	//TArray<TArray<FVector>> GridCoordinates;
+	TArray<FVector> GridPoints;
 	//UPROPERTY(BlueprintReadOnly)
 	TArray<FGridTriangle> Triangles;
 	TArray<FGridQuad> Quads;
@@ -79,11 +80,16 @@ public:
 	virtual void Tick(float DeltaTime) override;
 	virtual void OnConstruction(const FTransform& Transform) override;
 	void GenerateGrid();
-	
-	int GetFirstTriangleIndexOnHex(const uint32 Hex) { return 6 * Hex * Hex; }
+
+	static int GetFirstTriangleIndexOnHex(const uint32 Hex) { return 6 * Hex * Hex; }
+	static int GetNumberOfPointsOnHex(const uint32 Hex) { if(Hex == 0) return 1; return 6 * Hex; }
+	static int GetFirstPointIndexOnHex(const uint32 Hex) { if(Hex == 0) return 0; return Hex * (Hex - 1) / 2 * 6 + 1;}
+;	static int GetIndexOfPointOnHex(const uint32 Hex, const uint32 Point) { if (Hex == 0) return 0; return GetFirstPointIndexOnHex(Hex) + Point; }
+	const FVector& GetPointCoordinates(const uint32 Point) { return GridPoints[Point]; }
 	//virtual bool ShouldTickIfViewportsOnly() const override { return true; }
 	UDebugStrings* DebugStringsComp;
-	FVector GetGridCoordinate(const int Hex, const int Coordinate) {return GridCoordinates[Hex][Coordinate];}
+	//FVector GetGridCoordinate(const int Hex, const int Coordinate) {return GridCoordinates[Hex][Coordinate];}
 	const TArray<FGridTriangle>& GetTriangles() { return Triangles; }
 	const TArray<FGridQuad>& GetQuads() { return Quads; }
+	const TArray<FVector>& GetGridPoints() { return GridPoints; }
 };

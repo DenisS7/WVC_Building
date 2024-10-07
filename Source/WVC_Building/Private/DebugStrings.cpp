@@ -66,20 +66,19 @@ FDebugRenderSceneProxy* UDebugStrings::CreateDebugSceneProxy()
 		return DebugSceneProxy;
 	}
 	
-	/*TArray<FGridTriangle> Triangles = GridGen->GetTriangles();
-	for(int i = 0; i < Triangles.Num(); i++)
-	{
-
-		if(Triangles[i].Index == -1)
-			continue;
-		FVector Sum = FVector::Zero();
-		for(int k = 0; k < 3; k++)
-			Sum += GridGen->GetGridCoordinate(Triangles[i].Points[k].X, Triangles[i].Points[k].Y);
-		FVector TriangleCenter = Sum / 3.f;
-		ProxyData.DebugLabels.Add({TriangleCenter, FString::FromInt(Triangles[i].Index)});
-		
-		//DrawDebugString(GetWorld(), TriangleCenter, *FString::Printf(TEXT("T")), nullptr, FColor::Red, 100.f, true, 5.f);
-	}*/
+	//TArray<FGridTriangle> Triangles = GridGen->GetTriangles();
+	//for(int i = 0; i < Triangles.Num(); i++)
+	//{
+	//	if(Triangles[i].Index == -1)
+	//		continue;
+	//	FVector Sum = FVector::Zero();
+	//	for(int k = 0; k < 3; k++)
+	//		Sum += GridGen->GetPointCoordinates(Triangles[i].Points[k]);
+	//	FVector TriangleCenter = Sum / 3.f;
+	//	ProxyData.DebugLabels.Add({TriangleCenter, FString::FromInt(Triangles[i].Index)});
+	//	
+	//	//DrawDebugString(GetWorld(), TriangleCenter, *FString::Printf(TEXT("T")), nullptr, FColor::Red, 100.f, true, 5.f);
+	//}
 
 	TArray<FGridQuad> Quads = GridGen->GetQuads();
 	for(int i = 0; i < Quads.Num(); i++)
@@ -89,13 +88,20 @@ FDebugRenderSceneProxy* UDebugStrings::CreateDebugSceneProxy()
 			continue;
 		FVector Sum = FVector::Zero();
 		for(int k = 0; k < 4; k++)
-			Sum += GridGen->GetGridCoordinate(Quads[i].Points[k].X, Quads[i].Points[k].Y);
+			Sum += GridGen->GetPointCoordinates(Quads[i].Points[k]);
 		FVector QuadCenter = Sum / 4.f;
 		ProxyData.DebugLabels.Add({QuadCenter, FString::FromInt(Quads[i].Index)});
 		
 		//DrawDebugString(GetWorld(), TriangleCenter, *FString::Printf(TEXT("T")), nullptr, FColor::Red, 100.f, true, 5.f);
 	}
-	
+
+	const TArray<FVector> Points = GridGen->GetGridPoints();
+	for(int i = 0; i < Points.Num(); i++)
+	{
+		//ProxyData.DebugLabels.Add({Points[i], FString::FromInt(i)});
+		
+		//DrawDebugString(GetWorld(), TriangleCenter, *FString::Printf(TEXT("T")), nullptr, FColor::Red, 100.f, true, 5.f);
+	}
 	FDebugSceneProxy* DebugSceneProxy = new FDebugSceneProxy(this, &ProxyData);
 
 	
