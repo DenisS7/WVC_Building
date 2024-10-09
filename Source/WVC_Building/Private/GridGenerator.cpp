@@ -172,6 +172,7 @@ void AGridGenerator::DivideGridIntoQuads(const FVector& GridCenter)
 	}
 
 	int FinalQuadIndex = 0;
+	TMap<TPair<int, int>, int> Midpoints;
 	for(int i = 0; i < TrianglesLeft.Num(); i++)
 	{
 		const TArray<int>& TrPoints = Triangles[TrianglesLeft[i]].Points;
@@ -179,17 +180,16 @@ void AGridGenerator::DivideGridIntoQuads(const FVector& GridCenter)
 		for(int j = 0; j < 3; j++)
 			TriangleCenter += GridPoints[Triangles[TrianglesLeft[i]].Points[j]];
 		TriangleCenter /= 3.f;
-		TArray<FVector> MidPoints;
+		TArray<int> TriangleMidpoints;
 		for(int j = 0; j < 3; j++)
 		{
-			MidPoints.Add((GridPoints[TrPoints[j]] + GridPoints[TrPoints[(j + 1) % 3]]) / 2.f);	
-			GridPoints.Add(MidPoints.Last());
+			TriangleMidpoints.Add(GetMidpointIndex(Midpoints, TrPoints[j], TrPoints[(j + 1) % 3]));
 		}
 		GridPoints.Add(TriangleCenter);
 
-		TArray<int> Quad1Points = {TrPoints[0], GridPoints.Num() - 4, GridPoints.Num() - 1, GridPoints.Num() - 2};
-		TArray<int> Quad2Points = {TrPoints[1], GridPoints.Num() - 3, GridPoints.Num() - 1, GridPoints.Num() - 4};
-		TArray<int> Quad3Points = {TrPoints[2], GridPoints.Num() - 2, GridPoints.Num() - 1, GridPoints.Num() - 3};
+		TArray<int> Quad1Points = {TrPoints[0], TriangleMidpoints[0], GridPoints.Num() - 1, TriangleMidpoints[2]};
+		TArray<int> Quad2Points = {TrPoints[1], TriangleMidpoints[1], GridPoints.Num() - 1, TriangleMidpoints[0]};
+		TArray<int> Quad3Points = {TrPoints[2], TriangleMidpoints[2], GridPoints.Num() - 1, TriangleMidpoints[1]};
 		TArray<TArray<int>> QuadsPoints = {Quad1Points, Quad2Points, Quad3Points};
 		for(int j = 0; j < 3; j++)
 		{
@@ -199,16 +199,18 @@ void AGridGenerator::DivideGridIntoQuads(const FVector& GridCenter)
 	}
 	for(int i = 0; i < Quads.Num(); i++)
 	{
+		TArray<int> QuadMidpoints;
 		for(int j = 0; j < 4; j++)
 		{
-			GridPoints.Add((GridPoints[Quads[i].Points[j]] + GridPoints[Quads[i].Points[(j + 1) % 4]]) / 2.f);
+			QuadMidpoints.Add(GetMidpointIndex(Midpoints, Quads[i].Points[j], Quads[i].Points[(j + 1) % 4]));
+			//GridPoints.Add((GridPoints[Quads[i].Points[j]] + GridPoints[Quads[i].Points[(j + 1) % 4]]) / 2.f);
 		}
 		GridPoints.Add(Quads[i].Center);
 		
-		TArray<int> Quad1Points = {Quads[i].Points[0], GridPoints.Num() - 5, GridPoints.Num() - 1, GridPoints.Num() - 2};
-		TArray<int> Quad2Points = {Quads[i].Points[1], GridPoints.Num() - 4, GridPoints.Num() - 1, GridPoints.Num() - 5};
-		TArray<int> Quad3Points = {Quads[i].Points[2], GridPoints.Num() - 3, GridPoints.Num() - 1, GridPoints.Num() - 4};
-		TArray<int> Quad4Points = {Quads[i].Points[3], GridPoints.Num() - 2, GridPoints.Num() - 1, GridPoints.Num() - 3};
+		TArray<int> Quad1Points = {Quads[i].Points[0], QuadMidpoints[0], GridPoints.Num() - 1, QuadMidpoints[3]};
+		TArray<int> Quad2Points = {Quads[i].Points[1], QuadMidpoints[1], GridPoints.Num() - 1, QuadMidpoints[0]};
+		TArray<int> Quad3Points = {Quads[i].Points[2], QuadMidpoints[2], GridPoints.Num() - 1, QuadMidpoints[1]};
+		TArray<int> Quad4Points = {Quads[i].Points[3], QuadMidpoints[3], GridPoints.Num() - 1, QuadMidpoints[2]};
 		TArray<TArray<int>> QuadsPoints = {Quad1Points, Quad2Points, Quad3Points, Quad4Points};
 		for(int j = 0; j < 4; j++)
 		{
@@ -288,6 +290,21 @@ void AGridGenerator::RelaxGrid()
 	{
 		
 	}
+}
+
+int AGridGenerator::GetMidpointIndex(TMap<TPair<int, int>, int>& Midpoints, int Point1, int Point2)
+{
+	if(Point1 > Point2)
+		std::swap(Point1, Point2);
+	const TPair<int, int> Key(Point1, Point2);
+	if(Midpoints.Contains(Key))
+	{
+		return Midpoints[Key];
+	}
+	GridPoints.Add((GridPoints[Point1] + GridPoints[Point2]) / 2.f);
+	//Midpoints[Key] = GridPoints.Num() - 1;
+	Midpoints.Add(Key, GridPoints.Num() - 1);
+	return Midpoints[Key];
 }
 
 // Called every frame

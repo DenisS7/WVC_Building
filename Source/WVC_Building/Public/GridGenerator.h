@@ -74,6 +74,7 @@ protected:
 	void DivideGridIntoQuads(const FVector& GridCenter);
 	void SortQuadPoints(FGridQuad& Quad);
 	void RelaxGrid();
+	int GetMidpointIndex(TMap<TPair<int, int>, int>& Midpoints, int Point1, int Point2);
 public:
 	UPROPERTY(EditAnywhere)
 	float HexSize = 50.f;
