@@ -210,12 +210,40 @@ void AGridGenerator::DivideGridIntoQuads(const FVector& GridCenter)
 		TArray<int> Quad3Points = {Quads[i].Points[2], GridPoints.Num() - 3, GridPoints.Num() - 1, GridPoints.Num() - 4};
 		TArray<int> Quad4Points = {Quads[i].Points[3], GridPoints.Num() - 2, GridPoints.Num() - 1, GridPoints.Num() - 3};
 		TArray<TArray<int>> QuadsPoints = {Quad1Points, Quad2Points, Quad3Points, Quad4Points};
-		for(int j = 0; j < 3; j++)
+		for(int j = 0; j < 4; j++)
 		{
 			FinalQuads.Add({QuadsPoints[j], FinalQuadIndex++});
 			SortQuadPoints(FinalQuads.Last());
 		}
-		
+	}
+
+	for(int i = 0; i < FinalQuads.Num() - 1; i++)
+	{
+		for(int j = i + 1; j < FinalQuads.Num(); j++)
+		{
+			int CommonPoints = 0;
+			for(int k = 0; k < 4; k++)
+			{
+				bool Found = false;
+				for(int p = 0; p < 4; p++)
+				{
+					if(FinalQuads[i].Points[k] == FinalQuads[j].Points[p])
+					{
+						if(++CommonPoints == 2)
+						{
+							FinalQuads[i].Neighbours.Add(j);
+							FinalQuads[j].Neighbours.Add(i);
+							Found = true;
+							break;
+						}
+					}
+				}
+				if(Found)
+				{
+					break;
+				}
+			}
+		}
 	}
 }
 
@@ -251,6 +279,14 @@ void AGridGenerator::SortQuadPoints(FGridQuad& Quad)
 	for(int i = 0; i < Quad.Points.Num(); i++)
 	{
 		Quad.Points[i] = CopyPoints[Angles[i].Index];
+	}
+}
+
+void AGridGenerator::RelaxGrid()
+{
+	for(int i = 0; i < FinalQuads.Num(); i++)
+	{
+		
 	}
 }
 
@@ -388,4 +424,5 @@ void AGridGenerator::GenerateGrid()
 	}
 	DivideGridIntoTriangles(Center);
 	DivideGridIntoQuads(Center);
+	RelaxGrid();
 }
