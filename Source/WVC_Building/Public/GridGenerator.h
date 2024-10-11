@@ -68,18 +68,24 @@ protected:
 	TArray<FGridTriangle> Triangles;
 	TArray<FGridQuad> Quads;
 	TArray<FGridQuad> FinalQuads;
+	TArray<TArray<FVector>> PerfectQuads;
 	FVector Center;
 	void GenerateHexCoordinates(const FVector& GridCenter, const float Size, const uint32 Index);
 	void DivideGridIntoTriangles(const FVector& GridCenter);
 	void DivideGridIntoQuads(const FVector& GridCenter);
 	void SortQuadPoints(FGridQuad& Quad);
-	void RelaxGrid();
+	void RelaxGrid(float SquareSideLength);
 	int GetMidpointIndex(TMap<TPair<int, int>, int>& Midpoints, int Point1, int Point2);
 public:
 	UPROPERTY(EditAnywhere)
 	float HexSize = 50.f;
 	UPROPERTY(EditAnywhere)
 	uint32 GridSize = 5;
+	UPROPERTY(EditAnywhere)
+	uint32 RelaxIterations = 2;
+	UPROPERTY(EditAnywhere)
+	uint32 Seed = 0;
+	
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;
 	virtual void OnConstruction(const FTransform& Transform) override;

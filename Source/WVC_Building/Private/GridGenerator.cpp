@@ -4,6 +4,7 @@
 #include "GridGenerator.h"
 
 #include "DebugStrings.h"
+#include "Runtime/Core/Tests/Containers/TestUtils.h"
 
 // Sets default values
 AGridGenerator::AGridGenerator()
@@ -275,7 +276,7 @@ void AGridGenerator::SortQuadPoints(FGridQuad& Quad)
 	}
 	Angles.Sort([](const FPointAngle& A, const FPointAngle& B)
 	{
-		return A.Angle < B.Angle; // Counterclockwise sorting
+		return A.Angle > B.Angle; // Clockwise sorting
 	});
 	const TArray<int> CopyPoints = Quad.Points;
 	for(int i = 0; i < Quad.Points.Num(); i++)
@@ -284,11 +285,55 @@ void AGridGenerator::SortQuadPoints(FGridQuad& Quad)
 	}
 }
 
-void AGridGenerator::RelaxGrid()
+void AGridGenerator::RelaxGrid(float SquareSideLength)
 {
-	for(int i = 0; i < FinalQuads.Num(); i++)
+	const float r = (SquareSideLength * sqrt(2.f)) / 2.f;
+	TArray<FVector> GridPointsForce;
+	GridPointsForce.SetNumZeroed(GridPoints.Num());
+	for(uint32 Iterations = 0; Iterations < RelaxIterations; Iterations++)
 	{
+		PerfectQuads.Empty();
+		for(int i = 0; i < FinalQuads.Num(); i++)
+		{
+			TArray<int>& QuadPoints = FinalQuads[i].Points;
+			FVector NewCenter = FVector::ZeroVector;
+			for(int j = 0; j < 4; j++)
+				NewCenter += GridPoints[QuadPoints[j]];
+			NewCenter /= 4.f;
+			FinalQuads[i].Center = NewCenter;
+			float Alpha = 0.f;
+			for(int k = 0; k <= 1; k++)
+			{
+				float Numerator = GridPoints[QuadPoints[0]].Y + GridPoints[QuadPoints[1]].X - GridPoints[QuadPoints[2]].Y - GridPoints[QuadPoints[3]].X;
+				float Denominator = GridPoints[QuadPoints[0]].X - GridPoints[QuadPoints[1]].Y - GridPoints[QuadPoints[2]].X + GridPoints[QuadPoints[3]].Y;
+				Alpha = FMath::Atan( Numerator / Denominator) + static_cast<float>(k) * PI;
+				float SecondDerivative = 2.f * r * FMath::Cos(Alpha) * Denominator + 2.f * r * FMath::Sin(Alpha) * Numerator;
+				if(SecondDerivative > 0.f)
+				{
+					break;
+				}
+			}
+			TArray<FVector> SquarePoints;
+			float CosAlpha = FMath::Cos(Alpha);
+			float SinAlpha = FMath::Sin(Alpha);
+			SquarePoints.Emplace(FVector(r * CosAlpha, r * SinAlpha, 0.f) + FinalQuads[i].Center);
+			SquarePoints.Emplace(FVector(r * SinAlpha, -r * CosAlpha, 0.f) + FinalQuads[i].Center);
+			SquarePoints.Emplace(FVector(-r * CosAlpha, -r * SinAlpha, 0.f) + FinalQuads[i].Center);
+			SquarePoints.Emplace(FVector(-r * SinAlpha, r * CosAlpha, 0.f) + FinalQuads[i].Center);
 		
+			for(int k = 0; k < 4; k++)
+			{
+				FVector Diff = SquarePoints[k] - GridPoints[QuadPoints[k]];
+				Diff.Z = 0.f;
+				GridPointsForce[QuadPoints[k]] += Diff.GetSafeNormal();
+			}
+			PerfectQuads.Add(SquarePoints);
+		}
+		for(int i = 0; i < GridPoints.Num(); i++)
+		{
+			GridPoints[i] += GridPointsForce[i];
+			GridPointsForce[i] = FVector::ZeroVector;
+		}
 	}
 }
 
@@ -316,8 +361,12 @@ void AGridGenerator::Tick(float DeltaTime)
 void AGridGenerator::OnConstruction(const FTransform& Transform)
 {
 	Super::OnConstruction(Transform);
-
+	
 	FlushPersistentDebugLines(GetWorld());
+
+	FMath::RandInit(Seed);
+	FMath::SRandInit(Seed);
+	
 	GenerateGrid();
 	//for(int i = 0; i < GridCoordinates.Num(); i++)
 	//	for(int j = 0; j < GridCoordinates[i].Num(); j++)
@@ -423,7 +472,30 @@ void AGridGenerator::OnConstruction(const FTransform& Transform)
 			GetPointCoordinates(FinalQuads[i].Points[0]),
 			Color4.ToFColor(true),
 			true);
+		bool DrawPerfectSquares = false;
+		if(!DrawPerfectSquares)
+			continue;
 		//DrawDebugString(GetWorld(), TriangleCenter, *FString::Printf(TEXT("T")), nullptr, FColor::Red, 100.f, true, 5.f);
+		DrawDebugLine(GetWorld(), 
+PerfectQuads[i][0],
+	PerfectQuads[i][1],
+	Color.ToFColor(true),
+	true);
+		DrawDebugLine(GetWorld(), 
+		PerfectQuads[i][1],
+			PerfectQuads[i][2],
+			Color2.ToFColor(true),
+			true);
+		DrawDebugLine(GetWorld(), 
+		PerfectQuads[i][2],
+			PerfectQuads[i][3],
+			Color3.ToFColor(true),
+			true);
+		DrawDebugLine(GetWorld(), 
+		PerfectQuads[i][3],
+			PerfectQuads[i][0],
+			Color4.ToFColor(true),
+			true);
 	}
 }
 
@@ -433,6 +505,7 @@ void AGridGenerator::GenerateGrid()
 	Triangles.Empty();
 	Quads.Empty();
 	FinalQuads.Empty();
+	PerfectQuads.Empty();
 	Center = GetActorLocation();
 	GridPoints.Add(Center);
 	for(uint32 i = 0; i < GridSize; i++)
@@ -441,5 +514,5 @@ void AGridGenerator::GenerateGrid()
 	}
 	DivideGridIntoTriangles(Center);
 	DivideGridIntoQuads(Center);
-	RelaxGrid();
+	RelaxGrid((HexSize) / FMath::Sqrt(3.f));
 }
