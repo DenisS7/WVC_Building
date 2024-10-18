@@ -95,7 +95,21 @@ protected:
 	void RelaxGridBasedOnSquare(float SquareSideLength);
 	void RelaxGridBasedOnSquare2();
 	void RelaxGridBasedOnNeighbours();
+	void Relax2();
+	void Relax3();
 	int GetOrAddMidpointIndex(TMap<TPair<int, int>, int>& Midpoints, int Point1, int Point2);
+
+	uint32 IterationsUsed1 = 0;
+	uint32 IterationsUsed2 = 0;
+	
+	FTimerHandle SquareHandle1;
+	FTimerDelegate SquareDelegate1;
+	FTimerHandle SquareHandle2;
+	FTimerDelegate SquareDelegate2;
+	FTimerHandle TimerHandle;
+	FTimerHandle TimerHandle2;
+	FTimerDelegate Delegate1;
+	FTimerDelegate Delegate2;
 public:
 	UPROPERTY(EditAnywhere)
 	bool ShowGrid = true;
@@ -105,19 +119,34 @@ public:
 	float HexSize = 50.f;
 	UPROPERTY(EditAnywhere)
 	uint32 GridSize = 5;
-	UPROPERTY(EditAnywhere)
-	bool DoSquareRelaxationFirst = true;
+	//UPROPERTY(EditAnywhere)
+	//bool DoSquareRelaxationFirst = true;
 	UPROPERTY(EditAnywhere)
 	float SquareSize = 15.f;
 	UPROPERTY(EditAnywhere)
 	float ForceScale = 0.1f;
 	UPROPERTY(EditAnywhere)
-	uint32 SquareRelaxIterations = 10;
+	uint32 Square1RelaxIterations = 10;
+	UPROPERTY(EditAnywhere)
+	uint32 Square2RelaxIterations = 10;
 	UPROPERTY(EditAnywhere)
 	uint32 NeighbourRelaxIterations = 10;
 	UPROPERTY(EditAnywhere)
 	uint32 Seed = 0;
-	
+
+	UPROPERTY(EditAnywhere)
+	uint32 Square1Order = 1;
+	UPROPERTY(EditAnywhere)
+	uint32 Square2Order = 2;
+	UPROPERTY(EditAnywhere)
+	uint32 NeighbourOrder = 3;
+
+	UPROPERTY(EditAnywhere)
+	float Order1TimeRate = 0.1f;
+	UPROPERTY(EditAnywhere)
+	float Order2TimeRate = 0.1f;
+	UPROPERTY(EditAnywhere)
+	float Order3TimeRate = 0.1f;
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;
 	virtual void OnConstruction(const FTransform& Transform) override;
