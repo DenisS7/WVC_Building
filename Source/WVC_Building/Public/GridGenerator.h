@@ -8,6 +8,21 @@
 
 class UDebugStrings;
 
+struct FGridPoint
+{
+	int Index = -1;
+	FVector Location = FVector::ZeroVector;
+	TArray<int> Neighbours;
+
+	FGridPoint() {}
+
+	FGridPoint(const int InIndex, const FVector& InLocation)
+		: Index(InIndex), Location(InLocation) {};
+	
+	FGridPoint(const int InIndex, const FVector& InLocation, const TArray<int>& InNeighbours)
+		: Index(InIndex), Location(InLocation), Neighbours(InNeighbours) {};
+};
+
 struct FGridQuad
 {	
 	int Index = -1;
@@ -31,6 +46,7 @@ struct FGridTriangle
 	TArray<int> Points;
 	TArray<int> Neighbours;
 	bool FormsQuad = false;
+	
 	FGridTriangle() {}
 	
 	FGridTriangle(const TArray<int>& InPoints, const int InIndex)
@@ -63,7 +79,8 @@ protected:
 	//FVector GridCoordinates[10][60];
 	
 	//TArray<TArray<FVector>> GridCoordinates;
-	TArray<FVector> GridPoints;
+	TArray<FGridPoint> GridPoints;
+	//TArray<TArray<int>> GridPointNeighbours;
 	//UPROPERTY(BlueprintReadOnly)
 	TArray<FGridTriangle> Triangles;
 	TArray<FGridQuad> Quads;
@@ -73,34 +90,50 @@ protected:
 	void GenerateHexCoordinates(const FVector& GridCenter, const float Size, const uint32 Index);
 	void DivideGridIntoTriangles(const FVector& GridCenter);
 	void DivideGridIntoQuads(const FVector& GridCenter);
+	void FindPointNeighboursInQuad(const int QuadIndex);
 	void SortQuadPoints(FGridQuad& Quad);
-	void RelaxGrid(float SquareSideLength);
-	int GetMidpointIndex(TMap<TPair<int, int>, int>& Midpoints, int Point1, int Point2);
+	void RelaxGridBasedOnSquare(float SquareSideLength);
+	void RelaxGridBasedOnSquare2();
+	void RelaxGridBasedOnNeighbours();
+	int GetOrAddMidpointIndex(TMap<TPair<int, int>, int>& Midpoints, int Point1, int Point2);
 public:
+	UPROPERTY(EditAnywhere)
+	bool ShowGrid = true;
+	UPROPERTY(EditAnywhere)
+	bool ShowSquares = false;
 	UPROPERTY(EditAnywhere)
 	float HexSize = 50.f;
 	UPROPERTY(EditAnywhere)
 	uint32 GridSize = 5;
 	UPROPERTY(EditAnywhere)
-	uint32 RelaxIterations = 2;
+	bool DoSquareRelaxationFirst = true;
+	UPROPERTY(EditAnywhere)
+	float SquareSize = 15.f;
+	UPROPERTY(EditAnywhere)
+	float ForceScale = 0.1f;
+	UPROPERTY(EditAnywhere)
+	uint32 SquareRelaxIterations = 10;
+	UPROPERTY(EditAnywhere)
+	uint32 NeighbourRelaxIterations = 10;
 	UPROPERTY(EditAnywhere)
 	uint32 Seed = 0;
 	
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;
 	virtual void OnConstruction(const FTransform& Transform) override;
+	void DrawGrid();
 	void GenerateGrid();
 
 	static int GetFirstTriangleIndexOnHex(const uint32 Hex) { return 6 * Hex * Hex; }
 	static int GetNumberOfPointsOnHex(const uint32 Hex) { if(Hex == 0) return 1; return 6 * Hex; }
 	static int GetFirstPointIndexOnHex(const uint32 Hex) { if(Hex == 0) return 0; return Hex * (Hex - 1) / 2 * 6 + 1;}
 ;	static int GetIndexOfPointOnHex(const uint32 Hex, const uint32 Point) { if (Hex == 0) return 0; return GetFirstPointIndexOnHex(Hex) + Point; }
-	const FVector& GetPointCoordinates(const uint32 Point) { return GridPoints[Point]; }
+	const FVector& GetPointCoordinates(const uint32 Point) { return GridPoints[Point].Location; }
 	virtual bool ShouldTickIfViewportsOnly() const override { return true; }
 	UDebugStrings* DebugStringsComp;
 	//FVector GetGridCoordinate(const int Hex, const int Coordinate) {return GridCoordinates[Hex][Coordinate];}
 	const TArray<FGridTriangle>& GetTriangles() { return Triangles; }
 	const TArray<FGridQuad>& GetQuads() { return Quads; }
-	const TArray<FVector>& GetGridPoints() { return GridPoints; }
+	const TArray<FGridPoint>& GetGridPoints() { return GridPoints; }
 	const TArray<FGridQuad>& GetFinalQuads() { return FinalQuads; }
 };
