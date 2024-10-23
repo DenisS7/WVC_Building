@@ -18,7 +18,6 @@ FDebugSceneProxy::FDebugSceneProxy(const UPrimitiveComponent* InComponent, FDebu
 	{
 		this->Texts.Add({Text.Text, Text.Location, FColor::White});
 	}
-	
 }
 
 void FDebugTextDelegateHelper::DrawDebugLabels(UCanvas* Canvas, APlayerController* PlayerController)
@@ -93,6 +92,18 @@ FDebugRenderSceneProxy* UDebugStrings::CreateDebugSceneProxy()
 		//ProxyData.DebugLabels.Add({Quads[i].Center, FString::FromInt(Quads[i].Index)});
 		
 		//DrawDebugString(GetWorld(), TriangleCenter, *FString::Printf(TEXT("T")), nullptr, FColor::Red, 100.f, true, 5.f);
+	}
+	
+	if(GridGen->ShowGrid2Points)
+	{
+		const TArray<FGridPoint>& Grid2Points = GridGen->GetSecondGridPoints();
+		for(int i = 0; i < Grid2Points.Num(); i++)
+		{
+			if(Grid2Points[i].Index == -1)
+				continue;
+			ProxyData.DebugLabels.Add({Grid2Points[i].Location, FString::FromInt(Grid2Points[i].Index)});
+			//DSceneProxy->Texts.Emplace(FString::FromInt(Grid2Points[i].Index), Grid2Points[i].Location, Colors[3].ToFColor(true));
+		}
 	}
 
 	TArray<FGridQuad> FinalQuads = GridGen->GetFinalQuads();
