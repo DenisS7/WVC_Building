@@ -9,9 +9,13 @@
 class UGridGeneratorVis;
 class UDebugStrings;
 
+USTRUCT(BlueprintType)
 struct FGridPoint
 {
+	GENERATED_BODY()
+	UPROPERTY(BlueprintReadOnly)
 	int Index = -1;
+	UPROPERTY(BlueprintReadOnly)
 	FVector Location = FVector::ZeroVector;
 	TArray<int> Neighbours;
 	TArray<int> PartOfQuads;
@@ -66,22 +70,31 @@ struct FGridTriangle
 	}
 };
 
-enum class EShape
+UENUM(BlueprintType)
+enum class EShape : uint8
 {
 	Triangle = 3,
 	Quad = 4,
 	Pentagon = 5,
-	Hexagon = 6
+	Hexagon = 6,
+	None = 0
 };
 
+USTRUCT(BlueprintType)
 struct FGridShape
 {
+	GENERATED_BODY()
+	UPROPERTY(BlueprintReadOnly)
 	int Index = -1;
+	UPROPERTY(BlueprintReadOnly)
 	TArray<int> Points;
+	UPROPERTY(BlueprintReadOnly)
 	TArray<int> Neighbours;
+	UPROPERTY(BlueprintReadOnly)
 	FVector Center = FVector::ZeroVector;
-	EShape Shape;
+	EShape Shape = EShape::None;
 
+	FGridShape() {}
 	FGridShape(const int InIndex, const TArray<int>& InPoints)
 		: Index(InIndex), Points(InPoints)
 	{
@@ -108,8 +121,10 @@ protected:
 	TArray<FGridQuad> Quads;
 	TArray<FGridQuad> FinalQuads;
 	TArray<TArray<FVector>> PerfectQuads;
-	
+
+	UPROPERTY(BlueprintReadOnly)
 	TArray<FGridPoint> SecondGridPoints;
+	UPROPERTY(BlueprintReadOnly)
 	TArray<FGridShape> SecondGridShapes;
 	FVector Center;
 	void GenerateHexCoordinates(const FVector& GridCenter, const float Size, const uint32 Index);
