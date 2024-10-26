@@ -30,11 +30,18 @@ struct FGridPoint
 		: Index(InIndex), Location(InLocation), Neighbours(InNeighbours), IsEdge(InIsEdge) {};
 };
 
+USTRUCT(BlueprintType)
 struct FGridQuad
-{	
+{
+	GENERATED_BODY()
+	
+	UPROPERTY(BlueprintReadOnly)
 	int Index = -1;
+	UPROPERTY(BlueprintReadOnly)
 	FVector Center;
+	UPROPERTY(BlueprintReadOnly)
 	TArray<int> Points;
+	UPROPERTY(BlueprintReadOnly)
 	TArray<int> Neighbours;
 
 	FGridQuad() {}
@@ -115,10 +122,11 @@ protected:
 	virtual void BeginPlay() override;
 	UDebugStrings* DebugStringsComp;
 	UGridGeneratorVis* GridGeneratorVis;
-	
+	UPROPERTY(BlueprintReadOnly)
 	TArray<FGridPoint> GridPoints;
 	TArray<FGridTriangle> Triangles;
 	TArray<FGridQuad> Quads;
+	UPROPERTY(BlueprintReadOnly)
 	TArray<FGridQuad> FinalQuads;
 	TArray<TArray<FVector>> PerfectQuads;
 
