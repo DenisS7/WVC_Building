@@ -6,6 +6,7 @@
 #include "GameFramework/Actor.h"
 #include "GridGenerator.generated.h"
 
+class UDynamicMeshComponent;
 class UGridGeneratorVis;
 class UDebugStrings;
 
@@ -134,13 +135,19 @@ protected:
 	TArray<FGridPoint> SecondGridPoints;
 	UPROPERTY(BlueprintReadOnly)
 	TArray<FGridShape> SecondGridShapes;
+
+	UPROPERTY(BlueprintReadOnly, EditAnywhere)
+	UDynamicMeshComponent* WholeGridMesh;
+	UPROPERTY(BlueprintReadOnly, EditAnywhere)
+	UDynamicMeshComponent* SelectedQuadMesh;
+	
 	FVector Center;
 	void GenerateHexCoordinates(const FVector& GridCenter, const float Size, const uint32 Index);
 	void DivideGridIntoTriangles(const FVector& GridCenter);
 	void DivideGridIntoQuads(const FVector& GridCenter);
 	void FindPointNeighboursInQuad(const int QuadIndex);
 	void SortQuadPoints(FGridQuad& Quad);
-	void SortShapePoints(FGridShape& Shape);
+	void SortShapePoints(FGridShape& Shape, bool SecondGrid = true);
 	void RelaxGridBasedOnSquare(float SquareSideLength)	;
 	void RelaxGridBasedOnSquare2();
 	void RelaxGridBasedOnNeighbours();
@@ -148,6 +155,9 @@ protected:
 	void Relax3();
 	int GetOrAddMidpointIndexInGrid1(TMap<TPair<int, int>, int>& Midpoints, int Point1, int Point2);
 	void CreateSecondGrid();
+	void CreateWholeGridMesh();
+	bool IsPointInQuad(const FVector& Point, const FGridQuad& Quad) const;
+	int DetermineWhichQuadAPointIsIn(const FVector& Point);
 	uint32 IterationsUsed1 = 0;
 	uint32 IterationsUsed2 = 0;
 	

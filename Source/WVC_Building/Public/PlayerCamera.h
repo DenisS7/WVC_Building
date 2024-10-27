@@ -35,6 +35,8 @@ protected:
 	USpringArmComponent* SpringArm;
 	UPROPERTY(EditAnywhere)
 	UCameraComponent* Camera;
+	void OnLeftMouseButtonPressed();
+	void OnLeftMouseButtonReleased();
 	void OnRightMouseButtonPressed();
 	void OnRightMouseButtonReleased();
 	void OnMiddleMouseButtonPressed();

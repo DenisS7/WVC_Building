@@ -5,8 +5,12 @@
 
 #include "DebugStrings.h"
 #include "GridGeneratorVis.h"
+#include "Polygon2.h"
+#include "Components/DynamicMeshComponent.h"
 #include "Components/WidgetComponent.h"
 #include "Runtime/Core/Tests/Containers/TestUtils.h"
+#include "GeometryScript/MeshPrimitiveFunctions.h"
+#include "GeometryScript/MeshNormalsFunctions.h"
 
 // Sets default values
 AGridGenerator::AGridGenerator()
@@ -16,7 +20,11 @@ AGridGenerator::AGridGenerator()
 
 	DebugStringsComp = CreateDefaultSubobject<UDebugStrings>(TEXT("DebugStringsComponent"));
 	GridGeneratorVis = CreateDefaultSubobject<UGridGeneratorVis>(TEXT("GridGeneratorVis"));
-	
+
+	WholeGridMesh = CreateDefaultSubobject<UDynamicMeshComponent>(TEXT("WholeGridMesh"));
+	SelectedQuadMesh = CreateDefaultSubobject<UDynamicMeshComponent>(TEXT("SelectedQuadMesh"));
+	//UDynamicMesh* Mesh = new UDynamicMesh();
+	//WholeGridMesh->SetDynamicMesh();	
 	Delegate1 = FTimerDelegate::CreateUObject(this, &AGridGenerator::Relax2);
 	Delegate2 = FTimerDelegate::CreateUObject(this, &AGridGenerator::Relax3);
 	Delegate3 = FTimerDelegate::CreateUObject(this, &AGridGenerator::CreateSecondGrid);
@@ -38,7 +46,7 @@ void AGridGenerator::GenerateHexCoordinates(const FVector& GridCenter, const flo
 	//HexPoints.SetNum(NumPoints);
 	const int PrevNumPoints = GridPoints.Num();
 	GridPoints.SetNum(PrevNumPoints + NumPoints);
-	bool IsEdgePoint = (Index == HexSize - 1);
+	bool IsEdgePoint = (Index == GridSize - 2);
 	for(uint32 i = 0; i < 6; i++)
 	{
 		const float AngleRad = FMath::DegreesToRadians(60.f * i - 150.f);
@@ -310,11 +318,12 @@ void AGridGenerator::SortQuadPoints(FGridQuad& Quad)
 	}
 }
 
-void AGridGenerator::SortShapePoints(FGridShape& Shape)
+void AGridGenerator::SortShapePoints(FGridShape& Shape, const bool SecondGrid)
 {
 	FVector ShapeCenter = FVector::ZeroVector;
+	TArray<FGridPoint>& Points = SecondGrid ? SecondGridPoints : GridPoints;
 	for(int i = 0; i < Shape.Points.Num(); i++)
-		ShapeCenter += SecondGridPoints[Shape.Points[i]].Location;
+		ShapeCenter += Points[Shape.Points[i]].Location;
 	ShapeCenter /= static_cast<float>(Shape.Points.Num());
 	Shape.Center = ShapeCenter;
 	struct FPointAngle
@@ -331,7 +340,7 @@ void AGridGenerator::SortShapePoints(FGridShape& Shape)
 	TArray<FPointAngle> Angles;
 	for(int i = 0; i < Shape.Points.Num(); i++)
 	{
-		const FVector& GridCoordinate = SecondGridPoints[Shape.Points[i]].Location;
+		const FVector& GridCoordinate = Points[Shape.Points[i]].Location;
 		Angles.Add(FPointAngle(i, FMath::Atan2(GridCoordinate.Y - ShapeCenter.Y, GridCoordinate.X - ShapeCenter.X)));
 	}
 	Angles.Sort([](const FPointAngle& A, const FPointAngle& B)
@@ -638,6 +647,95 @@ void AGridGenerator::CreateSecondGrid()
 		//DrawSecondGrid();
 }
 
+void AGridGenerator::CreateWholeGridMesh()
+{
+	FGridShape WholeMeshShape;
+	for(int i = 0; i < GridPoints.Num(); i++)
+	{
+		if(GridPoints[i].IsEdge)
+			WholeMeshShape.Points.Add(i);
+	}
+	SortShapePoints(WholeMeshShape, false);
+	UE::Geometry::FPolygon2d MeshPolygon;
+	for(int i = 0; i < WholeMeshShape.Points.Num(); i++)
+	{
+		MeshPolygon.AppendVertex(UE::Math::TVector2(GridPoints[WholeMeshShape.Points[i]].Location));
+	}
+	if(MeshPolygon.IsClockwise())
+		MeshPolygon.Reverse();
+	WholeGridMesh->GetDynamicMesh()->Reset();
+	float MeshHeight = 10.f;
+	FTransform MeshTransform = FTransform();
+	MeshTransform.SetLocation(FVector(MeshTransform.GetLocation().X, MeshTransform.GetLocation().Y, GetActorLocation().Z - MeshHeight));
+	UGeometryScriptLibrary_MeshPrimitiveFunctions::AppendSimpleExtrudePolygon(WholeGridMesh->GetDynamicMesh(),
+	FGeometryScriptPrimitiveOptions(),
+	MeshTransform,
+	MeshPolygon.GetVertices(), //Vertices2D,
+	MeshHeight, // Height
+	5);
+	UGeometryScriptLibrary_MeshNormalsFunctions::ComputeSplitNormals(WholeGridMesh->GetDynamicMesh(), FGeometryScriptSplitNormalsOptions(), FGeometryScriptCalculateNormalsOptions());
+}
+
+bool AGridGenerator::IsPointInQuad(const FVector& Point, const FGridQuad& Quad) const
+{
+	auto Sign = [](const FVector& P1, const FVector& P2, const FVector& P3) {
+		return (P1.X - P3.X) * (P2.Y - P3.Y) - 
+			   (P2.X - P3.X) * (P1.Y - P3.Y);
+	};
+
+	const bool SameSide1 = Sign(Point, GetPointCoordinates(Quad.Points[0]), GetPointCoordinates(Quad.Points[1])) > 0;
+	const bool SameSide2 = Sign(Point, GetPointCoordinates(Quad.Points[1]), GetPointCoordinates(Quad.Points[2])) > 0;
+	const bool SameSide3 = Sign(Point, GetPointCoordinates(Quad.Points[2]), GetPointCoordinates(Quad.Points[3])) > 0;
+	const bool SameSide4 = Sign(Point, GetPointCoordinates(Quad.Points[3]), GetPointCoordinates(Quad.Points[0])) > 0;
+    
+	return (SameSide1 == SameSide2) && (SameSide2 == SameSide3) && (SameSide3 == SameSide4);
+}
+
+int AGridGenerator::DetermineWhichQuadAPointIsIn(const FVector& Point)
+{
+	FVector<bool> Visited;
+	//FVector<float> DistanceToQuad;
+	//FVector<bool> IsDistanceCalculated;
+	Visited.SetNum(FinalQuads.Num(), false);
+	//DistanceToQuad.SetNum(FinalQuads.Num());
+	int CurrentQuad = 0;
+	int VisitedQuadNumber = 0;
+	while(VisitedQuadNumber < FinalQuads.Num())
+	{
+		if(IsPointInQuad(Point, FinalQuads[CurrentQuad]))
+		{
+			return CurrentQuad;
+		}
+
+		Visited[CurrentQuad] = true;
+		VisitedQuadNumber++;
+
+		float ClosestNeighbourDistance = FLT_MAX;
+		int ClosestNeighbour = -1;
+
+		for(int i = 0; i < FinalQuads[CurrentQuad].Neighbours.Num(); i++)
+		{
+			const int NeighbourIndex = FinalQuads[CurrentQuad].Neighbours[i];
+			if(Visited[NeighbourIndex])
+				continue;
+			float DistanceBetween = FVector::DistSquared2D(Point, FinalQuads[CurrentQuad].Center);
+			if(DistanceBetween < ClosestNeighbourDistance)
+			{
+				ClosestNeighbourDistance = DistanceBetween;
+				ClosestNeighbour = NeighbourIndex;
+			}
+		}
+
+		if(ClosestNeighbour == -1)
+		{
+			return -1;
+		}
+
+		CurrentQuad = ClosestNeighbour;
+	}
+	return -1;
+}
+
 // Called every frame
 void AGridGenerator::Tick(float DeltaTime)
 {
@@ -876,6 +974,7 @@ void AGridGenerator::GenerateGrid()
 	{
 		Relax2();
 		Relax3();
+		CreateWholeGridMesh();
 		//if(ShowGrid)
 		//	DrawGrid();
 		CreateSecondGrid();
