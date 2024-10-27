@@ -6,6 +6,7 @@
 #include "GameFramework/Pawn.h"
 #include "PlayerCamera.generated.h"
 
+class AGridGenerator;
 class UCameraComponent;
 class USpringArmComponent;
 
@@ -17,7 +18,7 @@ class WVC_BUILDING_API APlayerCamera : public APawn
 public:
 	// Sets default values for this pawn's properties
 	APlayerCamera();
-
+	AGridGenerator* HoveredGrid = nullptr;
 protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
@@ -35,6 +36,10 @@ protected:
 	USpringArmComponent* SpringArm;
 	UPROPERTY(EditAnywhere)
 	UCameraComponent* Camera;
+
+	FTimerHandle SquareHoverTimerHandle;
+	FTimerDelegate SquareHoverDelegate;
+	
 	void OnLeftMouseButtonPressed();
 	void OnLeftMouseButtonReleased();
 	void OnRightMouseButtonPressed();
@@ -42,6 +47,7 @@ protected:
 	void OnMiddleMouseButtonPressed();
 	void OnMiddleMouseButtonReleased();
 	void OnMouseWheelAxis(float AxisValue);
+	void HoverOverShape();
 
 	void DragCamera();
 	void RotatePanCamera();

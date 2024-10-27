@@ -22,7 +22,7 @@ AGridGenerator::AGridGenerator()
 	GridGeneratorVis = CreateDefaultSubobject<UGridGeneratorVis>(TEXT("GridGeneratorVis"));
 
 	WholeGridMesh = CreateDefaultSubobject<UDynamicMeshComponent>(TEXT("WholeGridMesh"));
-	SelectedQuadMesh = CreateDefaultSubobject<UDynamicMeshComponent>(TEXT("SelectedQuadMesh"));
+	HoveredShapeMesh = CreateDefaultSubobject<UDynamicMeshComponent>(TEXT("SelectedQuadMesh"));
 	//UDynamicMesh* Mesh = new UDynamicMesh();
 	//WholeGridMesh->SetDynamicMesh();	
 	Delegate1 = FTimerDelegate::CreateUObject(this, &AGridGenerator::Relax2);
@@ -630,19 +630,53 @@ void AGridGenerator::CreateSecondGrid()
 				}
 			}
 		}
-			
 		SecondGridPoints.Emplace(i, FinalQuads[i].Center, IsEdge);
 	}
+	int NeighbourOffset = 0;
 	for(int i = 0; i < GridPoints.Num(); i++)
 	{
 		if(GridPoints[i].IsEdge)
+		{
+			NeighbourOffset++;
 			continue;
+		}
 		TArray<int> ShapePoints;
 		for(int j = 0; j < GridPoints[i].PartOfQuads.Num(); j++)
+		{
 			ShapePoints.Add(GridPoints[i].PartOfQuads[j]);
+		}
 		SecondGridShapes.Emplace(SecondGridShapes.Num(), ShapePoints);
 		SortShapePoints(SecondGridShapes.Last());
 	}
+	for(int i = 0; i < SecondGridShapes.Num() - 1; i++)
+	{
+		for(int j = i + 1; j < SecondGridShapes.Num(); j++)
+		{
+			int CommonPoints = 0;
+			for(int k = 0; k < SecondGridShapes[i].Points.Num(); k++)
+			{
+				bool Found = false;
+				for(int p = 0; p < SecondGridShapes[j].Points.Num(); p++)
+				{
+					if(SecondGridShapes[i].Points[k] == SecondGridShapes[j].Points[p])
+					{
+						if(++CommonPoints == 2)
+						{
+							SecondGridShapes[i].Neighbours.Add(j);
+							SecondGridShapes[j].Neighbours.Add(i);
+							Found = true;
+							break;
+						}
+					}
+				}
+				if(Found)
+				{
+					break;
+				}
+			}
+		}
+	}
+	bool ok = true;
 	//if(ShowSecondGrid)
 		//DrawSecondGrid();
 }
@@ -674,82 +708,77 @@ void AGridGenerator::CreateWholeGridMesh()
 	MeshHeight, // Height
 	5);
 	WholeGridMesh->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
-	if (WholeGridMesh->GetBodySetup() == nullptr)
-	{
-		bool ok = false;
-	}
-	else
-	{
-		bool ok = true;
-	}
-
 	UBodySetup* BodySetup = WholeGridMesh->GetBodySetup();
 	BodySetup->CollisionTraceFlag = CTF_UseComplexAsSimple;
 	WholeGridMesh->EnableComplexAsSimpleCollision();;
-	BodySetup->AggGeom.ConvexElems.Empty();  // Clear any existing collision data
-	BodySetup->CreatePhysicsMeshes();        // Create new collision data
+	BodySetup->AggGeom.ConvexElems.Empty();
+	BodySetup->CreatePhysicsMeshes(); 
 	WholeGridMesh->RecreatePhysicsState();
 	UGeometryScriptLibrary_MeshNormalsFunctions::ComputeSplitNormals(WholeGridMesh->GetDynamicMesh(), FGeometryScriptSplitNormalsOptions(), FGeometryScriptCalculateNormalsOptions());
 }
 
-bool AGridGenerator::IsPointInQuad(const FVector& Point, const FGridQuad& Quad) const
+bool AGridGenerator::IsPointInShape(const FVector& Point, const FGridShape& Shape) const
 {
 	auto Sign = [](const FVector& P1, const FVector& P2, const FVector& P3) {
 		return (P1.X - P3.X) * (P2.Y - P3.Y) - 
 			   (P2.X - P3.X) * (P1.Y - P3.Y);
 	};
 
-	const bool SameSide1 = Sign(Point, GetPointCoordinates(Quad.Points[0]), GetPointCoordinates(Quad.Points[1])) > 0;
-	const bool SameSide2 = Sign(Point, GetPointCoordinates(Quad.Points[1]), GetPointCoordinates(Quad.Points[2])) > 0;
-	const bool SameSide3 = Sign(Point, GetPointCoordinates(Quad.Points[2]), GetPointCoordinates(Quad.Points[3])) > 0;
-	const bool SameSide4 = Sign(Point, GetPointCoordinates(Quad.Points[3]), GetPointCoordinates(Quad.Points[0])) > 0;
-    
-	return (SameSide1 == SameSide2) && (SameSide2 == SameSide3) && (SameSide3 == SameSide4);
+	const bool SameSide1 = Sign(Point, GetSecondPointCoordinates(Shape.Points[0]), GetSecondPointCoordinates(Shape.Points[1])) > 0;
+	for(int i = 1; i < Shape.Points.Num(); i++)
+	{
+		const bool SameSide2 = Sign(Point, GetSecondPointCoordinates(Shape.Points[i]), GetSecondPointCoordinates(Shape.Points[(i + 1) % Shape.Points.Num()])) > 0;
+		if(SameSide1 != SameSide2)
+			return false;
+	}
+		
+	return true;
 }
 
-int AGridGenerator::DetermineWhichQuadAPointIsIn(const FVector& Point)
+int AGridGenerator::DetermineWhichGridShapeAPointIsIn(const FVector& Point)
 {
 	TArray<bool> Visited;
 	//FVector<float> DistanceToQuad;
 	//FVector<bool> IsDistanceCalculated;
-	Visited.SetNumZeroed(FinalQuads.Num());
+	Visited.SetNumZeroed(SecondGridShapes.Num());
 	//DistanceToQuad.SetNum(FinalQuads.Num());
-	int CurrentQuad = 0;
+	int CurrentShape = 0;
 	int VisitedQuadNumber = 0;
-	DrawDebugSphere(GetWorld(), Point, 6.f, 8, FColor::Purple, false, 10.f);
+	//DrawDebugSphere(GetWorld(), Point, 6.f, 8, FColor::Purple, false, 10.f);
 
-	while(VisitedQuadNumber < FinalQuads.Num())
+	while(VisitedQuadNumber < SecondGridShapes.Num())
 	{
-		if(IsPointInQuad(Point, FinalQuads[CurrentQuad]))
+		if(IsPointInShape(Point, SecondGridShapes[CurrentShape]))
 		{
-			return CurrentQuad;
+			UE_LOG(LogTemp, Warning, TEXT("Shape: %d"), CurrentShape);
+			return CurrentShape;
 		}
 		
-		Visited[CurrentQuad] = true;
+		Visited[CurrentShape] = true;
 		VisitedQuadNumber++;
 
 		float ClosestNeighbourDistance = FLT_MAX;
 		int ClosestNeighbour = -1;
 
-		for(int i = 0; i < FinalQuads[CurrentQuad].Neighbours.Num(); i++)
+		for(int i = 0; i < SecondGridShapes[CurrentShape].Neighbours.Num(); i++)
 		{
-			const int NeighbourIndex = FinalQuads[CurrentQuad].Neighbours[i];
+			const int NeighbourIndex = SecondGridShapes[CurrentShape].Neighbours[i];
 			if(Visited[NeighbourIndex])
 				continue;
-			float DistanceBetween = FVector::DistSquared2D(Point, FinalQuads[NeighbourIndex].Center);
+			float DistanceBetween = FVector::DistSquared2D(Point, SecondGridShapes[NeighbourIndex].Center);
 			if(DistanceBetween < ClosestNeighbourDistance)
 			{
 				ClosestNeighbourDistance = DistanceBetween;
 				ClosestNeighbour = NeighbourIndex;
 			}
 		}
-		DrawDebugSphere(GetWorld(), FinalQuads[CurrentQuad].Center, 5.f, 8, FColor::Yellow, false, 10.f);
+		//DrawDebugSphere(GetWorld(), SecondGridShapes[CurrentShape].Center, 5.f, 8, FColor::Yellow, false, 10.f);
 		if(ClosestNeighbour == -1)
 		{
 			return -1;
 		}
 
-		CurrentQuad = ClosestNeighbour;
+		CurrentShape = ClosestNeighbour;
 	}
 	return -1;
 }
@@ -770,80 +799,6 @@ void AGridGenerator::OnConstruction(const FTransform& Transform)
 	FMath::SRandInit(Seed);
 	
 	GenerateGrid();
-	//for(int i = 0; i < GridCoordinates.Num(); i++)
-	//	for(int j = 0; j < GridCoordinates[i].Num(); j++)
-	//	{
-	//		DrawDebugPoint(GetWorld(), GridCoordinates[i][j], 4.f, FColor::Blue, true);
-	//	}
-
-	//for(int i = 0; i < GridPoints.Num(); i++)
-	//{
-	//	//DrawDebugPoint(GetWorld(), GridPoints[i].Location, 4.f, FColor::Blue, true);
-	//}
-
-	//for(int i = 0; i < Triangles.Num(); i++)
-	//{
-	//	if(Triangles[i].Index == -1)
-	//		continue;
-	//	FLinearColor Color = FColor::Red;
-	//	FLinearColor Color2 = FColor::Green;
-	//	FLinearColor Color3 = FColor::Blue;
-	//	float LineThickness = 2.f;
-	//	//if(i != 24)
-	//	//	continue;
-	//	DrawDebugLine(GetWorld(), 
-	//	GridPoints[Triangles[i].Points[0]],
-	//		GridPoints[Triangles[i].Points[1]],
-	//		Color.ToFColor(true),
-	//		true);
-	//	DrawDebugLine(GetWorld(), 
-	//	GridPoints[Triangles[i].Points[1]],
-	//		GridPoints[Triangles[i].Points[2]],
-	//		Color2.ToFColor(true),
-	//		true);
-	//	DrawDebugLine(GetWorld(), 
-	//	GridPoints[Triangles[i].Points[2]],
-	//		GridPoints[Triangles[i].Points[0]],
-	//		Color3.ToFColor(true),
-	//		true);
-	//	//DrawDebugString(GetWorld(), TriangleCenter, *FString::Printf(TEXT("T")), nullptr, FColor::Red, 100.f, true, 5.f);
-	//}
-
-	//for(int i = 0; i < Quads.Num(); i++)
-	//{
-	//	if(Quads[i].Index == -1)
-	//		continue;
-	//	FLinearColor Color = FColor::Red;
-	//	FLinearColor Color2 = FColor::Green;
-	//	FLinearColor Color3 = FColor::Blue;
-	//	FLinearColor Color4 = FColor::Yellow;
-	//	float LineThickness = 2.f;
-	//	//if(i != 24)
-	//	//	continue;
-	//	DrawDebugLine(GetWorld(), 
-	//	GetPointCoordinates(Quads[i].Points[0]),
-	//		GetPointCoordinates(Quads[i].Points[1]),
-	//		Color.ToFColor(true),
-	//		true);
-	//	DrawDebugLine(GetWorld(), 
-	//	GetPointCoordinates(Quads[i].Points[1]),
-	//		GetPointCoordinates(Quads[i].Points[2]),
-	//		Color2.ToFColor(true),
-	//		true);
-	//	DrawDebugLine(GetWorld(), 
-	//	GetPointCoordinates(Quads[i].Points[2]),
-	//		GetPointCoordinates(Quads[i].Points[3]),
-	//		Color3.ToFColor(true),
-	//		true);
-	//	DrawDebugLine(GetWorld(), 
-	//	GetPointCoordinates(Quads[i].Points[3]),
-	//		GetPointCoordinates(Quads[i].Points[0]),
-	//		Color4.ToFColor(true),
-	//		true);
-	//	//DrawDebugString(GetWorld(), TriangleCenter, *FString::Printf(TEXT("T")), nullptr, FColor::Red, 100.f, true, 5.f);
-	//}
-	//DrawGrid();
-
 }
 
 void AGridGenerator::DrawGrid()
@@ -934,13 +889,6 @@ void AGridGenerator::DrawSecondGrid()
 
 void AGridGenerator::GenerateGrid()
 {
-	//Delegate1.Unbind();
-	//GetWorld()->GetTimerManager().ClearTimer(TimerHandle);
-	//Delegate2.Unbind();
-	//GetWorld()->GetTimerManager().ClearTimer(TimerHandle2);
-	//Handle.Invalidate();
-	//GetWorld()->GetTimerManager().ClearTimer(Handle);
-	
 	GridPoints.Empty();
 	Triangles.Empty();
 	Quads.Empty();
@@ -979,9 +927,6 @@ void AGridGenerator::GenerateGrid()
 	else if (NeighbourOrder == 2)
 		It3 = NeighbourRelaxIterations;
 
-	//Relax2();
-	//Relax3();
-	//CreateSecondGrid();
 	if(Debug)
 	{
 		GetWorld()->GetTimerManager().SetTimer(TimerHandle, Delegate1, Order1TimeRate * (It1 + 1), false, Order1TimeRate * (It1 + 1));
@@ -993,8 +938,40 @@ void AGridGenerator::GenerateGrid()
 		Relax2();
 		Relax3();
 		CreateWholeGridMesh();
-		//if(ShowGrid)
-		//	DrawGrid();
 		CreateSecondGrid();
 	}
+}
+
+void AGridGenerator::CreateShapeMesh(const int ShapeIndex)
+{
+	UE::Geometry::FPolygon2d MeshPolygon;
+	for(int i = 0; i < SecondGridShapes[ShapeIndex].Points.Num(); i++)
+	{
+		MeshPolygon.AppendVertex(UE::Math::TVector2(SecondGridPoints[SecondGridShapes[ShapeIndex].Points[i]].Location));
+	}
+	if(MeshPolygon.IsClockwise())
+		MeshPolygon.Reverse();
+	HoveredShapeMesh->GetDynamicMesh()->Reset();
+	float MeshHeight = 10.f;
+	FTransform MeshTransform = FTransform();
+	MeshTransform.SetLocation(FVector(MeshTransform.GetLocation().X, MeshTransform.GetLocation().Y, GetActorLocation().Z - MeshHeight));
+	UGeometryScriptLibrary_MeshPrimitiveFunctions::AppendSimpleExtrudePolygon(HoveredShapeMesh->GetDynamicMesh(),
+	FGeometryScriptPrimitiveOptions(),
+	MeshTransform,
+	MeshPolygon.GetVertices(),
+	MeshHeight,
+	5);
+	HoveredShapeMesh->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+	UBodySetup* BodySetup = HoveredShapeMesh->GetBodySetup();
+	BodySetup->CollisionTraceFlag = CTF_UseComplexAsSimple;
+	HoveredShapeMesh->EnableComplexAsSimpleCollision();
+	BodySetup->AggGeom.ConvexElems.Empty();
+	BodySetup->CreatePhysicsMeshes(); 
+	HoveredShapeMesh->RecreatePhysicsState();
+	UGeometryScriptLibrary_MeshNormalsFunctions::ComputeSplitNormals(HoveredShapeMesh->GetDynamicMesh(), FGeometryScriptSplitNormalsOptions(), FGeometryScriptCalculateNormalsOptions());
+}
+
+void AGridGenerator::ResetShapeMesh()
+{
+	HoveredShapeMesh->GetDynamicMesh()->Reset();
 }

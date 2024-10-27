@@ -139,7 +139,7 @@ protected:
 	UPROPERTY(BlueprintReadOnly, EditAnywhere)
 	UDynamicMeshComponent* WholeGridMesh;
 	UPROPERTY(BlueprintReadOnly, EditAnywhere)
-	UDynamicMeshComponent* SelectedQuadMesh;
+	UDynamicMeshComponent* HoveredShapeMesh;
 	
 	FVector Center;
 	void GenerateHexCoordinates(const FVector& GridCenter, const float Size, const uint32 Index);
@@ -156,7 +156,7 @@ protected:
 	int GetOrAddMidpointIndexInGrid1(TMap<TPair<int, int>, int>& Midpoints, int Point1, int Point2);
 	void CreateSecondGrid();
 	void CreateWholeGridMesh();
-	bool IsPointInQuad(const FVector& Point, const FGridQuad& Quad) const;
+	bool IsPointInShape(const FVector& Point, const FGridShape& Quad) const;
 	uint32 IterationsUsed1 = 0;
 	uint32 IterationsUsed2 = 0;
 	
@@ -226,8 +226,10 @@ public:
 	void DrawGrid();
 	void DrawSecondGrid();
 	void GenerateGrid();
-
-	int DetermineWhichQuadAPointIsIn(const FVector& Point);
+	void CreateShapeMesh(const int ShapeIndex);
+	void ResetShapeMesh();
+	
+	int DetermineWhichGridShapeAPointIsIn(const FVector& Point);
 	static int GetFirstTriangleIndexOnHex(const uint32 Hex) { return 6 * Hex * Hex; }
 	static int GetNumberOfPointsOnHex(const uint32 Hex) { if(Hex == 0) return 1; return 6 * Hex; }
 	static int GetFirstPointIndexOnHex(const uint32 Hex) { if(Hex == 0) return 0; return Hex * (Hex - 1) / 2 * 6 + 1;}

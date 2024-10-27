@@ -4,6 +4,7 @@
 #include "PlayerCamera.h"
 
 #include "GridGenerator.h"
+#include "UtilityLibrary.h"
 #include "Camera/CameraComponent.h"
 #include "GameFramework/SpringArmComponent.h"
 
@@ -17,12 +18,15 @@ APlayerCamera::APlayerCamera()
 	Camera->SetupAttachment(SpringArm);
 	SpringArm->TargetArmLength = 2000.f;
 	SpringArm->SetRelativeRotation(FRotator(-60.f, 0.f, 0.f));
+
+	SquareHoverDelegate = FTimerDelegate::CreateUObject(this, &APlayerCamera::HoverOverShape);
 }
 
 // Called when the game starts or when spawned
 void APlayerCamera::BeginPlay()
 {
 	Super::BeginPlay();
+	GetWorld()->GetTimerManager().SetTimer(SquareHoverTimerHandle, SquareHoverDelegate, 0.01f, true, 0.f);
 }
 
 // Called every frame
@@ -52,24 +56,7 @@ void APlayerCamera::SetupPlayerInputComponent(UInputComponent* PlayerInputCompon
 
 void APlayerCamera::OnLeftMouseButtonPressed()
 {
-	FHitResult HitResult;
-	FVector WorldLocation;
-	FVector WorldDirection;
-	GetWorld()->GetFirstPlayerController()->DeprojectMousePositionToWorld(WorldLocation, WorldDirection);
-	const bool bHit = GetWorld()->LineTraceSingleByChannel(HitResult,
-		WorldLocation,
-		WorldLocation + WorldDirection * 10000.f,
-		ECC_Visibility);
-	DrawDebugLine(GetWorld(), WorldLocation, WorldLocation + WorldDirection * 10000.f, FColor::Red, true, 5.f, 0, 2.f);
-	if(bHit)
-	{
-		AGridGenerator* GridGen = Cast<AGridGenerator>(HitResult.GetActor());
-		if(GridGen)
-		{
-			int Quad = GridGen->DetermineWhichQuadAPointIsIn(HitResult.Location);
-			UE_LOG(LogTemp, Warning, TEXT("Quad: %d"), Quad);
-		}
-	}
+	//HoverOverShape();	
 }
 
 void APlayerCamera::OnLeftMouseButtonReleased()
@@ -100,6 +87,21 @@ void APlayerCamera::OnMiddleMouseButtonReleased()
 void APlayerCamera::OnMouseWheelAxis(float AxisValue)
 {
 	SpringArm->TargetArmLength = FMath::Clamp(AxisValue * -1.f * ZoomFactor + SpringArm->TargetArmLength, 1500.f, 5000.f);
+}
+
+void APlayerCamera::HoverOverShape()
+{
+	AGridGenerator* Grid = nullptr;
+	int Shape = -1;
+	UtilityLibrary::GetGridAndShapeMouseIsHoveringOver(GetWorld(), Grid, Shape);
+	if(!Grid || Shape < 0)
+	{
+		if(HoveredGrid)
+			HoveredGrid->ResetShapeMesh();
+		return;
+	}
+	HoveredGrid = Grid;
+	Grid->CreateShapeMesh(Shape);
 }
 
 void APlayerCamera::DragCamera()
