@@ -3,6 +3,7 @@
 
 #include "PlayerCamera.h"
 
+#include "GridGenerator.h"
 #include "Camera/CameraComponent.h"
 #include "GameFramework/SpringArmComponent.h"
 
@@ -51,7 +52,24 @@ void APlayerCamera::SetupPlayerInputComponent(UInputComponent* PlayerInputCompon
 
 void APlayerCamera::OnLeftMouseButtonPressed()
 {
-	
+	FHitResult HitResult;
+	FVector WorldLocation;
+	FVector WorldDirection;
+	GetWorld()->GetFirstPlayerController()->DeprojectMousePositionToWorld(WorldLocation, WorldDirection);
+	const bool bHit = GetWorld()->LineTraceSingleByChannel(HitResult,
+		WorldLocation,
+		WorldLocation + WorldDirection * 10000.f,
+		ECC_Visibility);
+	DrawDebugLine(GetWorld(), WorldLocation, WorldLocation + WorldDirection * 10000.f, FColor::Red, true, 5.f, 0, 2.f);
+	if(bHit)
+	{
+		AGridGenerator* GridGen = Cast<AGridGenerator>(HitResult.GetActor());
+		if(GridGen)
+		{
+			int Quad = GridGen->DetermineWhichQuadAPointIsIn(HitResult.Location);
+			UE_LOG(LogTemp, Warning, TEXT("Quad: %d"), Quad);
+		}
+	}
 }
 
 void APlayerCamera::OnLeftMouseButtonReleased()

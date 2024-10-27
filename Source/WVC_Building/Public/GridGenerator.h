@@ -157,7 +157,6 @@ protected:
 	void CreateSecondGrid();
 	void CreateWholeGridMesh();
 	bool IsPointInQuad(const FVector& Point, const FGridQuad& Quad) const;
-	int DetermineWhichQuadAPointIsIn(const FVector& Point);
 	uint32 IterationsUsed1 = 0;
 	uint32 IterationsUsed2 = 0;
 	
@@ -228,6 +227,7 @@ public:
 	void DrawSecondGrid();
 	void GenerateGrid();
 
+	int DetermineWhichQuadAPointIsIn(const FVector& Point);
 	static int GetFirstTriangleIndexOnHex(const uint32 Hex) { return 6 * Hex * Hex; }
 	static int GetNumberOfPointsOnHex(const uint32 Hex) { if(Hex == 0) return 1; return 6 * Hex; }
 	static int GetFirstPointIndexOnHex(const uint32 Hex) { if(Hex == 0) return 0; return Hex * (Hex - 1) / 2 * 6 + 1;}

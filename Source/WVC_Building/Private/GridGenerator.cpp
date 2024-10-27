@@ -673,6 +673,22 @@ void AGridGenerator::CreateWholeGridMesh()
 	MeshPolygon.GetVertices(), //Vertices2D,
 	MeshHeight, // Height
 	5);
+	WholeGridMesh->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+	if (WholeGridMesh->GetBodySetup() == nullptr)
+	{
+		bool ok = false;
+	}
+	else
+	{
+		bool ok = true;
+	}
+
+	UBodySetup* BodySetup = WholeGridMesh->GetBodySetup();
+	BodySetup->CollisionTraceFlag = CTF_UseComplexAsSimple;
+	WholeGridMesh->EnableComplexAsSimpleCollision();;
+	BodySetup->AggGeom.ConvexElems.Empty();  // Clear any existing collision data
+	BodySetup->CreatePhysicsMeshes();        // Create new collision data
+	WholeGridMesh->RecreatePhysicsState();
 	UGeometryScriptLibrary_MeshNormalsFunctions::ComputeSplitNormals(WholeGridMesh->GetDynamicMesh(), FGeometryScriptSplitNormalsOptions(), FGeometryScriptCalculateNormalsOptions());
 }
 
@@ -693,20 +709,22 @@ bool AGridGenerator::IsPointInQuad(const FVector& Point, const FGridQuad& Quad) 
 
 int AGridGenerator::DetermineWhichQuadAPointIsIn(const FVector& Point)
 {
-	FVector<bool> Visited;
+	TArray<bool> Visited;
 	//FVector<float> DistanceToQuad;
 	//FVector<bool> IsDistanceCalculated;
-	Visited.SetNum(FinalQuads.Num(), false);
+	Visited.SetNumZeroed(FinalQuads.Num());
 	//DistanceToQuad.SetNum(FinalQuads.Num());
 	int CurrentQuad = 0;
 	int VisitedQuadNumber = 0;
+	DrawDebugSphere(GetWorld(), Point, 6.f, 8, FColor::Purple, false, 10.f);
+
 	while(VisitedQuadNumber < FinalQuads.Num())
 	{
 		if(IsPointInQuad(Point, FinalQuads[CurrentQuad]))
 		{
 			return CurrentQuad;
 		}
-
+		
 		Visited[CurrentQuad] = true;
 		VisitedQuadNumber++;
 
@@ -718,14 +736,14 @@ int AGridGenerator::DetermineWhichQuadAPointIsIn(const FVector& Point)
 			const int NeighbourIndex = FinalQuads[CurrentQuad].Neighbours[i];
 			if(Visited[NeighbourIndex])
 				continue;
-			float DistanceBetween = FVector::DistSquared2D(Point, FinalQuads[CurrentQuad].Center);
+			float DistanceBetween = FVector::DistSquared2D(Point, FinalQuads[NeighbourIndex].Center);
 			if(DistanceBetween < ClosestNeighbourDistance)
 			{
 				ClosestNeighbourDistance = DistanceBetween;
 				ClosestNeighbour = NeighbourIndex;
 			}
 		}
-
+		DrawDebugSphere(GetWorld(), FinalQuads[CurrentQuad].Center, 5.f, 8, FColor::Yellow, false, 10.f);
 		if(ClosestNeighbour == -1)
 		{
 			return -1;
