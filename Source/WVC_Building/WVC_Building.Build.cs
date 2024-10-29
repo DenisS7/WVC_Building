@@ -8,9 +8,9 @@ public class WVC_Building : ModuleRules
 	{
 		PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
 	
-		PublicDependencyModuleNames.AddRange(new string[] { "Core", "CoreUObject", "Engine", "InputCore", "EnhancedInput", "RHI", "GeometryScriptingCore", "GeometryFramework", "GeometryCore", "DynamicMesh" });
+		PublicDependencyModuleNames.AddRange(new string[] { "Core", "CoreUObject", "Engine", "InputCore", "EnhancedInput", "RHI", "GeometryScriptingCore", "GeometryFramework", "GeometryCore", "DynamicMesh", "ProceduralMeshComponent" });
 
-		PrivateDependencyModuleNames.AddRange(new string[] { "UnrealEd", "EditorFramework", "LevelEditor" });
+		PrivateDependencyModuleNames.AddRange(new string[] { "UnrealEd", "EditorFramework", "LevelEditor", "ProceduralMeshComponent" });
 
 		// Uncomment if you are using Slate UI
 		PrivateDependencyModuleNames.AddRange(new string[] { "Slate", "SlateCore" });

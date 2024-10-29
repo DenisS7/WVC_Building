@@ -3,6 +3,7 @@
 
 #include "PlayerCamera.h"
 
+#include "BuildingPiece.h"
 #include "GridGenerator.h"
 #include "UtilityLibrary.h"
 #include "Camera/CameraComponent.h"
@@ -56,6 +57,24 @@ void APlayerCamera::SetupPlayerInputComponent(UInputComponent* PlayerInputCompon
 
 void APlayerCamera::OnLeftMouseButtonPressed()
 {
+	AGridGenerator* Grid = nullptr;
+	int Shape = -1;
+	UtilityLibrary::GetGridAndShapeMouseIsHoveringOver(GetWorld(), Grid, Shape);
+	if(!Grid || Shape < 0)
+	{
+		return;
+	}
+	if(Grid->GetSecondGrid()[Shape].Points.Num() != 4)
+		return;
+	TArray<FVector> CageBase;
+	for(int i = 0; i < 4; i++)
+		CageBase.Add(Grid->GetSecondPointCoordinates(Grid->GetSecondGrid()[Shape].Points[i]));
+	ABuildingPiece* NewBuildingPiece = GetWorld()->SpawnActor<ABuildingPiece>(BuildingPieceToSpawn, Grid->GetSecondGrid()[Shape].Center, FRotator(0, 0, 0));
+	//CageBase.Swap(0,3);
+	//CageBase.Swap(1,2);
+	NewBuildingPiece->DeformMesh(CageBase, 200.f);
+	//HoveredGrid = Grid;
+	//Grid->CreateShapeMesh(Shape);
 	//HoverOverShape();	
 }
 

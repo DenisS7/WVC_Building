@@ -11,6 +11,14 @@
 			"AdditionalDependencies": [
 				"Engine"
 			]
+		},
+		{
+			"Name": "WVC_Building",
+			"Type": "Runtime",
+			"LoadingPhase": "Default",
+			"AdditionalDependencies": [
+				"ProceduralMeshComponent"
+			]
 		}
 	],
 	"Plugins": [
@@ -27,6 +35,10 @@
 		},
 		{
 			"Name": "GeometryProcessing",
+			"Enabled": true
+		},
+		{
+			"Name": "ProceduralMeshComponent",
 			"Enabled": true
 		}
 	]

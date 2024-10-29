@@ -6,6 +6,7 @@
 #include "GameFramework/Pawn.h"
 #include "PlayerCamera.generated.h"
 
+class ABuildingPiece;
 class AGridGenerator;
 class UCameraComponent;
 class USpringArmComponent;
@@ -55,6 +56,8 @@ public:
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;
 
+	UPROPERTY(EditAnywhere)
+	TSubclassOf<ABuildingPiece> BuildingPieceToSpawn;
 	// Called to bind functionality to input
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
 
