@@ -405,19 +405,20 @@ void AGridGenerator::RelaxGridBasedOnSquare(const float SquareSideLength)
 					 {	
 						 FVector Diff = SquarePoints[k] - GridPoints[QuadPoints[k]].Location;
 						 Diff.Z = 0.f;
-						 GridPointsForce[QuadPoints[k]] += Diff.GetSafeNormal();
+						 GridPointsForce[QuadPoints[k]] += Diff;
 					 }
 					 PerfectQuads.Add(SquarePoints);
 				 }
 				 for(int i = 0; i < GridPoints.Num(); i++)
 				 {
-					 GridPoints[i].Location += GridPointsForce[i];
+					 GridPoints[i].Location += GridPointsForce[i] * 0.1f;
 					 GridPointsForce[i] = FVector::ZeroVector;
 				 }
 				 DrawGrid();
 				 IterationsUsed1++;
 			 });
 		}
+		GetWorld()->GetTimerManager().SetTimer(SquareHandle1, SquareDelegate1, Order1TimeRate, true);
 	}
 	else
 	{
@@ -471,7 +472,6 @@ void AGridGenerator::RelaxGridBasedOnSquare(const float SquareSideLength)
 			 //DrawGrid();
 		}
 	}
-	GetWorld()->GetTimerManager().SetTimer(SquareHandle1, SquareDelegate1, Order1TimeRate, true);
 }
 
 void AGridGenerator::RelaxGridBasedOnSquare2()
