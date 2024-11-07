@@ -42,10 +42,10 @@ UMeshDeformerComponent::UMeshDeformerComponent()
         CageFaces.Add(TArray<int>{CageFaces[j][0] + 17, CageFaces[j][1] + 17, CageFaces[j][2] + 17, CageFaces[j][3] + 17});
     }
     TArray<FVector> InCageVertices;
-    InCageVertices.Emplace(-100.f, -100.f, 0.f);
-    InCageVertices.Emplace(-100.f, 100.f, 0.f);
-    InCageVertices.Emplace(100.f, 100.f, 0.f);
-    InCageVertices.Emplace(100.f, -100.f, 0.f);
+    InCageVertices.Emplace(-100.01f, 100.01f, 0.f);
+    InCageVertices.Emplace(100.01f, 100.01f, 0.f);
+    InCageVertices.Emplace(100.01f, -100.01f, 0.f);
+    InCageVertices.Emplace(-100.01f, -100.01f, 0.f);
     FVector Center = FVector::ZeroVector;
     for(int i = 0; i < 4; i++)
     {
@@ -60,11 +60,11 @@ UMeshDeformerComponent::UMeshDeformerComponent()
         {
             for(int j = 0; j < 2; j++)
             {
-                InitialCageVertices.Add(InCageVertices[i] * (1.f - static_cast<float>(j) / 2.f) + InCageVertices[(i + 1) % InCageVertices.Num()] * (static_cast<float>(j) / 2.f) + FVector(0.f, 0.f, (static_cast<float>(k) / 2.f) * 200.f));
+                InitialCageVertices.Add(InCageVertices[i] * (1.f - static_cast<float>(j) / 2.f) + InCageVertices[(i + 1) % InCageVertices.Num()] * (static_cast<float>(j) / 2.f) + FVector(0.f, 0.f, (static_cast<float>(k) / 2.f) * 200.01f));
             }
         }
     }
-    InitialCageVertices.Insert(Center + FVector(0.f, 0.f, 200.f), 17);
+    InitialCageVertices.Insert(Center + FVector(0.f, 0.f, 200.01f), 17);
 }
 
 void UMeshDeformerComponent::BeginPlay()
