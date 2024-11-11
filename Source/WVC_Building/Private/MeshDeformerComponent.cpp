@@ -236,7 +236,7 @@ void UMeshDeformerComponent::DeformMesh(const TArray<FVector>& InCageVertices, c
         Center += InCageVertices[i];
     }
     Center /= 4.f;
-    CageVertices.Add(Center);
+    CageVertices.Add(Center - Center);
     
     for(int k = 0; k < 3; k++)
     {
@@ -244,13 +244,13 @@ void UMeshDeformerComponent::DeformMesh(const TArray<FVector>& InCageVertices, c
         {
             for(int j = 0; j < 2; j++)
             {
-                CageVertices.Add(InCageVertices[i] * (1.f - static_cast<float>(j) / 2.f) + InCageVertices[(i + 1) % InCageVertices.Num()] * (static_cast<float>(j) / 2.f) + FVector(0.f, 0.f, (static_cast<float>(k) / 2.f) * InHeight));
+                CageVertices.Add(InCageVertices[i] * (1.f - static_cast<float>(j) / 2.f) + InCageVertices[(i + 1) % InCageVertices.Num()] * (static_cast<float>(j) / 2.f) + FVector(0.f, 0.f, (static_cast<float>(k) / 2.f) * InHeight) - Center);
             }
         }
     }
-    CageVertices.Insert(Center + FVector(0, 0, InHeight), 17);
+    CageVertices.Insert(FVector(0, 0, InHeight), 17);
     
-    FlushPersistentDebugLines(GetWorld());
+    //FlushPersistentDebugLines(GetWorld());
     for(int i = 0; i < CageFaces.Num(); i++)
     {
         for(int j = 0; j < CageFaces[i].Num(); j++)

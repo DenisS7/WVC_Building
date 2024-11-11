@@ -34,6 +34,16 @@ AGridGenerator::AGridGenerator()
 void AGridGenerator::BeginPlay()
 {
 	Super::BeginPlay();
+	TArray<bool> Elevation;
+	for(int i = 0; i < GridPoints.Num(); i++)
+		Elevation.Add(false);
+	MarchingBits.Add(Elevation);
+	MarchingBits.Add(Elevation);
+	//for(int i = 0; i < FinalQuads.Num(); i++)
+	//{
+	//	FirstElevation.Emplace(i, 0);
+	//}
+	//VoxelConfig.Add(FirstElevation);
 }
 
 void AGridGenerator::GenerateHexCoordinates(const FVector& GridCenter, const float Size, const uint32 Index)
@@ -632,6 +642,7 @@ void AGridGenerator::CreateSecondGrid()
 		}
 		SecondGridPoints.Emplace(i, FinalQuads[i].Center, IsEdge);
 	}
+	
 	int NeighbourOffset = 0;
 	for(int i = 0; i < GridPoints.Num(); i++)
 	{
@@ -645,9 +656,10 @@ void AGridGenerator::CreateSecondGrid()
 		{
 			ShapePoints.Add(GridPoints[i].PartOfQuads[j]);
 		}
-		SecondGridShapes.Emplace(SecondGridShapes.Num(), ShapePoints);
+		SecondGridShapes.Emplace(SecondGridShapes.Num(), ShapePoints, i);
 		SortShapePoints(SecondGridShapes.Last());
 	}
+	
 	for(int i = 0; i < SecondGridShapes.Num() - 1; i++)
 	{
 		for(int j = i + 1; j < SecondGridShapes.Num(); j++)
@@ -676,7 +688,9 @@ void AGridGenerator::CreateSecondGrid()
 			}
 		}
 	}
-	bool ok = true;
+
+	//TArray<FVoxelConfig> FirstElevation;
+
 	//if(ShowSecondGrid)
 		//DrawSecondGrid();
 }
@@ -894,6 +908,10 @@ void AGridGenerator::GenerateGrid()
 	Quads.Empty();
 	FinalQuads.Empty();
 	PerfectQuads.Empty();
+	BuildingPieces.Empty();
+	MarchingBits.Empty();
+	//FirstElevation.Empty();
+	//VoxelConfig.Empty();
 	Center = GetActorLocation();
 	GridPoints.Emplace(GridPoints.Num(), Center);
 	for(uint32 i = 0; i < GridSize - 1; i++)

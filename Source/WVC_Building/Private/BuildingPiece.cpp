@@ -12,9 +12,13 @@ ABuildingPiece::ABuildingPiece()
 	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
 	PrimaryActorTick.bCanEverTick = true;
 	StaticMeshComponent = CreateDefaultSubobject<UStaticMeshComponent>("StaticMeshComponent");
+	StaticMeshComponent->SetHiddenInGame(true);
+	SetRootComponent(StaticMeshComponent);
 	ProceduralMeshComponent = CreateDefaultSubobject<UProceduralMeshComponent>("ProceduralMeshComponent");
 	MeshDeformerComponent = CreateDefaultSubobject<UMeshDeformerComponent>("MeshDeformerComponent");
 	MeshDeformerComponent->ProceduralMeshComp = ProceduralMeshComponent;
+	MarchingCorners.Init(false, 8);
+	ProceduralMeshComponent->SetupAttachment(StaticMeshComponent);
 }
 
 // Called when the game starts or when spawned

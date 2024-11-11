@@ -52,6 +52,9 @@ protected:
 
 	void DragCamera();
 	void RotatePanCamera();
+
+	UPROPERTY(EditAnywhere)
+	TMap<int, UStaticMesh*> GroundTiles;
 public:	
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;

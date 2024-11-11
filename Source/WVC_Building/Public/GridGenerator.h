@@ -6,6 +6,7 @@
 #include "GameFramework/Actor.h"
 #include "GridGenerator.generated.h"
 
+class ABuildingPiece;
 class UDynamicMeshComponent;
 class UGridGeneratorVis;
 class UDebugStrings;
@@ -44,7 +45,7 @@ struct FGridQuad
 	TArray<int> Points;
 	UPROPERTY(BlueprintReadOnly)
 	TArray<int> Neighbours;
-
+	
 	FGridQuad() {}
 
 	FGridQuad(const TArray<int>& InPoints, const int InIndex)
@@ -99,14 +100,39 @@ struct FGridShape
 	UPROPERTY(BlueprintReadOnly)
 	TArray<int> Neighbours;
 	UPROPERTY(BlueprintReadOnly)
+	int CorrespondingGrid1Point = 0;
+	UPROPERTY(BlueprintReadOnly)
 	FVector Center = FVector::ZeroVector;
+	
 	EShape Shape = EShape::None;
 
 	FGridShape() {}
-	FGridShape(const int InIndex, const TArray<int>& InPoints)
-		: Index(InIndex), Points(InPoints)
+	FGridShape(const int InIndex, const TArray<int>& InPoints, const int InCorrespondingGrid1Point)
+		: Index(InIndex), Points(InPoints), CorrespondingGrid1Point(InCorrespondingGrid1Point)
 	{
 		Shape = static_cast<EShape>(InPoints.Num());
+	}
+};
+
+USTRUCT(BlueprintType)
+struct FVoxelConfig
+{
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadOnly)
+	int CorrespondingQuadIndex = -1;
+	UPROPERTY(BlueprintReadOnly)
+	TArray<bool> ConfigurationCorners;
+	UPROPERTY(BlueprintReadOnly)
+	int Elevation = -1;
+	UPROPERTY(BlueprintReadOnly)
+	ABuildingPiece* BuildingPiece = nullptr;
+	
+	FVoxelConfig() {}
+	FVoxelConfig(const int InCorrespondingQuadIndex, const int InElevation)
+		: CorrespondingQuadIndex(InCorrespondingQuadIndex), Elevation(InElevation)
+	{
+		ConfigurationCorners.Init(false, 8);
 	}
 };
 
@@ -130,7 +156,9 @@ protected:
 	UPROPERTY(BlueprintReadOnly)
 	TArray<FGridQuad> FinalQuads;
 	TArray<TArray<FVector>> PerfectQuads;
-
+	
+	
+	
 	UPROPERTY(BlueprintReadOnly)
 	TArray<FGridPoint> SecondGridPoints;
 	UPROPERTY(BlueprintReadOnly)
@@ -170,7 +198,15 @@ protected:
 	FTimerDelegate Delegate1;
 	FTimerDelegate Delegate2;
 	FTimerDelegate Delegate3;
+
 public:
+	//UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	//TArray<FVoxelConfig> FirstElevation;
+	
+	//TArray<TArray<FVoxelConfig>> VoxelConfig;
+	TArray<TArray<bool>> MarchingBits;
+	TMap<TPair<int, int>, ABuildingPiece*> BuildingPieces;
+	
 	UPROPERTY(EditAnywhere, Category = "Show Debug")
 	bool Debug = false;
 	UPROPERTY(EditAnywhere, Category = "Show Debug")
@@ -222,6 +258,7 @@ public:
 	float Order3TimeRate = 0.1f;
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;
+	//virtual void override;
 	virtual void OnConstruction(const FTransform& Transform) override;
 	void DrawGrid();
 	void DrawSecondGrid();

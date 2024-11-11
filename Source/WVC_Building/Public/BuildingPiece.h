@@ -18,7 +18,6 @@ class WVC_BUILDING_API ABuildingPiece : public AActor
 public:
 	// Sets default values for this actor's properties
 	ABuildingPiece();
-
 protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
@@ -28,9 +27,16 @@ protected:
 	UProceduralMeshComponent* ProceduralMeshComponent;
 	UPROPERTY(EditAnywhere)
 	UMeshDeformerComponent* MeshDeformerComponent;
-public:
+	UPROPERTY(EditAnywhere)
+	uint32 Elevation = 0;
+	UPROPERTY(EditAnywhere)
+	uint32 QuadIndex = 0;
+	UPROPERTY(EditAnywhere)
+	TArray<bool> MarchingCorners;
+public:	
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;
 
+	void SetStaticMesh(UStaticMesh* StaticMesh) { StaticMeshComponent->SetStaticMesh(StaticMesh); }
 	void DeformMesh(const TArray<FVector>& CageBase, const float CageHeight);
 };
