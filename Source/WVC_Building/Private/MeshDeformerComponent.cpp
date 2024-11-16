@@ -251,13 +251,13 @@ void UMeshDeformerComponent::DeformMesh(const TArray<FVector>& InCageVertices, c
     CageVertices.Insert(FVector(0, 0, InHeight), 17);
     
     //FlushPersistentDebugLines(GetWorld());
-    for(int i = 0; i < CageFaces.Num(); i++)
-    {
-        for(int j = 0; j < CageFaces[i].Num(); j++)
-        {
-            DrawDebugLine(GetWorld(), CageVertices[CageFaces[i][j]], CageVertices[CageFaces[i][(j + 1) % CageFaces[i].Num()]], FColor::Green, false, 100.f, 0, 2.f);
-        }
-    }
+    //for(int i = 0; i < CageFaces.Num(); i++)
+    //{
+    //    for(int j = 0; j < CageFaces[i].Num(); j++)
+    //    {
+    //        DrawDebugLine(GetWorld(), CageVertices[CageFaces[i][j]], CageVertices[CageFaces[i][(j + 1) % CageFaces[i].Num()]], FColor::Green, false, 100.f, 0, 2.f);
+    //    }
+    //}
     for(int i = 0; i < OriginalVertices.Num(); i++)
     {
         DeformedVertices.Add(ComputeSMVCCoordinate(OriginalVertices[i]));

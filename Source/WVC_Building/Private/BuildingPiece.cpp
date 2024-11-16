@@ -34,7 +34,7 @@ void ABuildingPiece::Tick(float DeltaTime)
 	Super::Tick(DeltaTime);
 }
 
-void ABuildingPiece::DeformMesh(const TArray<FVector>& CageBase, const float CageHeight)
+void ABuildingPiece::DeformMesh(const TArray<FVector>& CageBase, const float CageHeight, const float Rotation)
 {
     if (!StaticMeshComponent || !StaticMeshComponent->GetStaticMesh())
     {
@@ -67,7 +67,7 @@ void ABuildingPiece::DeformMesh(const TArray<FVector>& CageBase, const float Cag
             // Copy vertex positions
             for (uint32 i = 0; i < VertexBuffer->GetNumVertices(); i++)
             {
-                Vertices.Add(static_cast<FVector>(VertexBuffer->VertexPosition(i)));
+                Vertices.Add(static_cast<FVector>(VertexBuffer->VertexPosition(i)).RotateAngleAxis(Rotation, UE::Math::TVector<double>(0.f, 0.f, 1.f)));
             }
 
             // Copy indices
@@ -85,6 +85,7 @@ void ABuildingPiece::DeformMesh(const TArray<FVector>& CageBase, const float Cag
             StaticMeshComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
         	
             MeshDeformerComponent->InitializeMeshData(Vertices, Triangles, Normals, UVs, Tangents);
+        	ProceduralMeshComponent->SetMaterial(0, StaticMeshComponent->GetMaterial(0));
         }
         else
         {

@@ -19,6 +19,7 @@ class WVC_BUILDING_API APlayerCamera : public APawn
 public:
 	// Sets default values for this pawn's properties
 	APlayerCamera();
+	UDataTable* DataTable;
 	AGridGenerator* HoveredGrid = nullptr;
 protected:
 	// Called when the game starts or when spawned
