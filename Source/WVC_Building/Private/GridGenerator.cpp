@@ -764,7 +764,7 @@ int AGridGenerator::DetermineWhichGridShapeAPointIsIn(const FVector& Point)
 	{
 		if(IsPointInShape(Point, SecondGridShapes[CurrentShape]))
 		{
-			UE_LOG(LogTemp, Warning, TEXT("Shape: %d"), CurrentShape);
+			//UE_LOG(LogTemp, Warning, TEXT("Shape: %d"), CurrentShape);
 			return CurrentShape;
 		}
 		
