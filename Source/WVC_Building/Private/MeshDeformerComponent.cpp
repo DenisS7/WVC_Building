@@ -112,31 +112,31 @@ void UMeshDeformerComponent::BeginPlay()
 
 double UMeshDeformerComponent::GetAngleBetweenUnitVectors(const FVector& U1, const FVector& U2)
 {
-    double DotProduct = UE::Geometry::Dot(U1, U2);
-    DotProduct = FMath::Clamp(DotProduct, -1.0, 1.0); // Clamp to valid range
-    double Angle = acos(DotProduct);
-    if (isnan(Angle))
-    {
-        // Handle NaN angle
-        Angle = 0.0;
-    }
-    return Angle;
-    //return 2.0 * asin( (U1 - U2).Size() / 2.0 );
+    //double DotProduct = UE::Geometry::Dot(U1, U2);
+    //DotProduct = FMath::Clamp(DotProduct, -1.0, 1.0); // Clamp to valid range
+    //double Angle = acos(DotProduct);
+    //if (isnan(Angle))
+    //{
+    //    // Handle NaN angle
+    //    Angle = 0.0;
+    //}
+    //return Angle;
+    return 2.0 * asin( (U1 - U2).Size() / 2.0 );
 }
 
 double UMeshDeformerComponent::GetTangentOfHalfAngleBetweenUnitVectors(const FVector& U1, const FVector& U2)
 {
-    double DotProduct = UE::Geometry::Dot(U1, U2);
-    double CosTheta = FMath::Clamp(DotProduct, -1.0, 1.0);
-    double SinTheta = (UE::Geometry::Cross(U1, U2)).Size();
-    if (SinTheta < 0.000000001)
-    {
-        // Handle zero sine case
-        return 0.0;
-    }
-    return SinTheta / (1.0 + CosTheta);
-    //double Factor = (U1 - U2).Size() / 2.0;
-   // return Factor / sqrt( FMath::Max(1.0 - Factor * Factor , 0.0) );
+    //double DotProduct = UE::Geometry::Dot(U1, U2);
+    //double CosTheta = FMath::Clamp(DotProduct, -1.0, 1.0);
+    //double SinTheta = (UE::Geometry::Cross(U1, U2)).Size();
+    //if (SinTheta < 0.000000001)
+    //{
+    //    // Handle zero sine case
+    //    return 0.0;
+    //}
+    //return SinTheta / (1.0 + CosTheta);
+    double Factor = (U1 - U2).Size() / 2.0;
+    return Factor / sqrt( FMath::Max(1.0 - Factor * Factor , 0.0) );
 }
 
 void UMeshDeformerComponent::InitializeMeshData(const TArray<FVector>& InVertices, const TArray<int32>& InTriangles,
@@ -241,30 +241,38 @@ void UMeshDeformerComponent::ComputeSMVCWeights(const FVector& Point, TArray<dou
             
             double TanAlphaIBy2 = GetTangentOfHalfAngleBetweenUnitVectors(Normal1, Normal2);
 
-            double TanAlphaMinusIBy2 = GetTangentOfHalfAngleBetweenUnitVectors((UE::Geometry::Cross(FaceMeanVector, UiMinus1) * 100000.f).GetSafeNormal(),
-                                                                        (UE::Geometry::Cross(FaceMeanVector, Ui) * 100000.f).GetSafeNormal());
+            FVector Cross3 = UE::Geometry::Cross(FaceMeanVector, UiMinus1);
+            FVector Cross4 = UE::Geometry::Cross(FaceMeanVector, Ui);
+
+            FVector Normal3 = (Cross3 * 100000.f).GetSafeNormal();
+            FVector Normal4 = (Cross4 * 100000.f).GetSafeNormal();
+            
+            double TanAlphaMinusIBy2 = GetTangentOfHalfAngleBetweenUnitVectors(Normal3, Normal4);
 
             double TangentsSum = TanAlphaIBy2 + TanAlphaMinusIBy2;
 
             Lambdas[i] = VFNormDividedBySinTheTai * TangentsSum / D[Vi];
             Denominator += TangentsSum * UE::Geometry::Dot(FaceMeanVector, Ui) / UE::Geometry::Cross(FaceMeanVector, Ui).Size();
-            if(Vi == 0 || Vi == 17)
+            if(Vi == 1 || Vi == 5)
             {
                 TArray<Out>& Array = Outs.FindOrAdd(Vi);
                 Array.Emplace(Vi, f, Lambdas[i], Denominator, FaceMeanVector, D[Vi], U[Vi]);
-                //if((Vi == 1 || Vi == 18) && (f == 4 || f == 12))
+                //if(f == 6 || f == 1) //(Vi == 4 || Vi == 5))// && (f == 4 || f == 12))
                 {
-                    //UE_LOG(LogTemp, Warning, TEXT("OG Point: %s, Index: %d, Face: %d, Lambda: %f, Denominator: %f, Lambda/Denom: %f, FaceMeanVector: %s, Distance: %f, UnitVector: %s"), *Point.ToString(), Vi, f, Lambdas[i], Denominator, Lambdas[i] / Denominator, *FaceMeanVector.ToString(), D[Vi], *U[Vi].ToString());
+                    //UE_LOG(LogTemp, Warning, TEXT("OG Point: %s, Index: %d, Face: %d, Lambda: %f, Denominator: %f, Lambda/Denom: %f, FaceMeanVector: %s"), *Point.ToString(), Vi, f, Lambdas[i], Denominator, Lambdas[i] / Denominator, *FaceMeanVector.ToString());
+                    //UE_LOG(LogTemp, Warning, TEXT("DistanceMinus1: %f, Distance: %f, DistancePlus1: %f"), D[ViMinus1], D[Vi], D[ViPlus1]);
+                    //UE_LOG(LogTemp, Warning, TEXT("UMinus1: %s, U: %s, UPlus1: %s"), *U[ViMinus1].ToString(), *U[Vi].ToString(), *U[ViPlus1].ToString());
                     //UE_LOG(LogTemp, Warning, TEXT("VFNorm: %f"), VFNormDividedBySinTheTai);
                     //UE_LOG(LogTemp, Warning, TEXT("Cross1: %s, Normal1: %s"), *Cross1.ToString(), *Normal1.ToString());
                     //UE_LOG(LogTemp, Warning, TEXT("Cross2: %s, Normal2: %s"), *Cross2.ToString(), *Normal2.ToString());
+                    //UE_LOG(LogTemp, Warning, TEXT("Cross3: %s, Normal3: %s"), *Cross3.ToString(), *Normal3.ToString());
+                    //UE_LOG(LogTemp, Warning, TEXT("Cross4: %s, Normal4: %s"), *Cross4.ToString(), *Normal4.ToString());
                     //UE_LOG(LogTemp, Warning, TEXT("TanAplha1By2: %f, TanAlphaMinus1By2: %f"), TanAlphaIBy2, TanAlphaMinusIBy2);
                     //UE_LOG(LogTemp, Warning, TEXT(" "));
-
                 }
             }
         }
-        UE_LOG(LogTemp, Warning, TEXT(" "));
+        //UE_LOG(LogTemp, Warning, TEXT(" "));
         if(fabs(Denominator) < Epsilon)// DBL_EPSILON)
         {
             W_Weights.Empty();
@@ -293,8 +301,8 @@ void UMeshDeformerComponent::ComputeSMVCWeights(const FVector& Point, TArray<dou
             double Lambdai = Lambdas[i] / Denominator;
             W_Weights[Vi] += Lambdai;
             SumWeights += Lambdai;
-            if(Vi == 0 || Vi == 17)
-                UE_LOG(LogTemp, Warning, TEXT("Index: %d, Lambda: %f, Denominator: %f, Lambda/Denom: %f, Weight: %f"), Vi, Lambdas[i], Denominator, Lambdai, W_Weights[Vi]);
+            //if(Vi == 4 || Vi == 5)
+            //    UE_LOG(LogTemp, Warning, TEXT("Index: %d, Lambda: %f, Denominator: %f, Lambda/Denom: %f, Weight: %f"), Vi, Lambdas[i], Denominator, Lambdai, W_Weights[Vi]);
         }
     }
 
@@ -309,27 +317,27 @@ void UMeshDeformerComponent::ComputeSMVCWeights(const FVector& Point, TArray<dou
         //UE_LOG(LogTemp, Warning, TEXT(" "));
     }
 
-    UE_LOG(LogTemp, Warning, TEXT(" "));
+    //UE_LOG(LogTemp, Warning, TEXT(" "));
     for(int v = 0; v < InitialCageVertices.Num(); v++)
     {
         OutWeights[v] = W_Weights[v] / SumWeights;
-        if(v == 0 || v == 17)
-            UE_LOG(LogTemp, Warning, TEXT("Index: %d, Weight: %f, NormalizedWeight: %f, SumWeights: %f"), v, W_Weights[v], OutWeights[v], SumWeights);
+        //if(v == 4 || v == 5)
+        //    UE_LOG(LogTemp, Warning, TEXT("Index: %d, Weight: %f, NormalizedWeight: %f, SumWeights: %f"), v, W_Weights[v], OutWeights[v], SumWeights);
     }
-    UE_LOG(LogTemp, Warning, TEXT(" "));
+    //UE_LOG(LogTemp, Warning, TEXT(" "));
 }
 
 FVector UMeshDeformerComponent::ComputeSMVCCoordinate(const FVector& OriginalCoordinate)
 {
     TArray<double> Weights;
+    //UE_LOG(LogTemp, Error, TEXT("Name: %s, OG Coordinate: %s"), *GetOwner()->GetName(), *OriginalCoordinate.ToString());
     ComputeSMVCWeights(OriginalCoordinate, Weights);
     FVector DeformedCoordinate = FVector::ZeroVector;
     
-    UE_LOG(LogTemp, Error, TEXT("Name: %s, OG Coordinate: %s"), *GetOwner()->GetName(), *OriginalCoordinate.ToString());
     for(int i = 0; i < CageVertices.Num(); i++)
     {
         DeformedCoordinate += Weights[i] * CageVertices[i];
-        UE_LOG(LogTemp, Warning, TEXT("Index: %d, Weight: %f, OG Cage Vertex: %s, Cage Vertex: %s, Influence: %s, Current Deformed Coordinate: %s"), i, Weights[i], *InitialCageVertices[i].ToString(), *CageVertices[i].ToString(), *(Weights[i] * CageVertices[i]).ToString(), *DeformedCoordinate.ToString());
+        //UE_LOG(LogTemp, Warning, TEXT("Index: %d, Weight: %f, OG Cage Vertex: %s, Cage Vertex: %s, Influence: %s, Current Deformed Coordinate: %s"), i, Weights[i], *InitialCageVertices[i].ToString(), *CageVertices[i].ToString(), *(Weights[i] * CageVertices[i]).ToString(), *DeformedCoordinate.ToString());
     }
     return DeformedCoordinate;
 }
