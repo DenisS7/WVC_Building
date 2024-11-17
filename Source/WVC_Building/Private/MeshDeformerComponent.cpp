@@ -208,7 +208,7 @@ void UMeshDeformerComponent::ComputeSMVCWeights(const FVector& Point, TArray<dou
 
     TMap<int, TArray<Out>> Outs;
     
-    TArray<int> IndicesToWatch = {14,15};
+    TArray<int> IndicesToWatch = {0};
     
     for(int f = 0; f < CageFaces.Num(); f++)
     {
@@ -252,16 +252,16 @@ void UMeshDeformerComponent::ComputeSMVCWeights(const FVector& Point, TArray<dou
             FVector Cross1 = UE::Geometry::Cross(FaceMeanVector, Ui);
             FVector Cross2 = UE::Geometry::Cross(FaceMeanVector, UiPlus1);
 
-            FVector Normal1 = (Cross1 * 100000.f).GetSafeNormal();
-            FVector Normal2 = (Cross2 * 100000.f).GetSafeNormal();
+            FVector Normal1 = (Cross1 * 100000.f).GetSafeNormal(DBL_EPSILON);
+            FVector Normal2 = (Cross2 * 100000.f).GetSafeNormal(DBL_EPSILON);
             
             double TanAlphaIBy2 = GetTangentOfHalfAngleBetweenUnitVectors(Normal1, Normal2);
 
             FVector Cross3 = UE::Geometry::Cross(FaceMeanVector, UiMinus1);
             FVector Cross4 = UE::Geometry::Cross(FaceMeanVector, Ui);
 
-            FVector Normal3 = (Cross3 * 100000.f).GetSafeNormal();
-            FVector Normal4 = (Cross4 * 100000.f).GetSafeNormal();
+            FVector Normal3 = (Cross3 * 100000.f).GetSafeNormal(DBL_EPSILON);
+            FVector Normal4 = (Cross4 * 100000.f).GetSafeNormal(DBL_EPSILON);
             
             double TanAlphaMinusIBy2 = GetTangentOfHalfAngleBetweenUnitVectors(Normal3, Normal4);
 
@@ -351,7 +351,7 @@ FVector UMeshDeformerComponent::ComputeSMVCCoordinate(const FVector& OriginalCoo
     FString OwnerName = GetOwner()->GetName();
     int32 Index = OwnerName.Len() - 1;
     TCHAR LastChar = OwnerName[Index];
-    if(LastChar == '1')
+    if(LastChar == '0')
     {
         Log2 = true;
     }
@@ -406,7 +406,7 @@ void UMeshDeformerComponent::DeformMesh(const TArray<FVector>& InCageVertices, c
     //}
     for(int i = 0; i < OriginalVertices.Num(); i++)
     {
-        if(i == 33)
+        if(i == 22)
             Log1 = true;
         else Log1 = false;
         DeformedVertices.Add(ComputeSMVCCoordinate(OriginalVertices[i]));
