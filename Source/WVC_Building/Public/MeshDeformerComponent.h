@@ -19,7 +19,8 @@ public:
 	
 protected:
 	virtual void BeginPlay() override;
-
+	bool Log1 = false;
+	bool Log2 = false;
 public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Mesh Deformer")
 	UProceduralMeshComponent* ProceduralMeshComp = nullptr;
