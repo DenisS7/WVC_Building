@@ -48,7 +48,7 @@ public:
 private:
 	FVector ComputeSMVCCoordinate(const FVector& OriginalCoordinate);
 	void ComputeSMVCWeights(const FVector& Point, TArray<double>& OutWeights);
-	double GetAngleBetweenUnitVectors(const FVector& U1, const FVector& U2);
-	double GetTangentOfHalfAngleBetweenUnitVectors(const FVector& U1, const FVector& U2);
+	double GetAngleBetweenUnitVectors(const UE::Math::TVector<double>& U1, const UE::Math::TVector<double>& U2);
+	double GetTangentOfHalfAngleBetweenUnitVectors(const UE::Math::TVector<double>& U1, const UE::Math::TVector<double>& U2);
 
 };
