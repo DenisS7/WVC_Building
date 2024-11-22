@@ -29,7 +29,7 @@ UMeshDeformerComponent::UMeshDeformerComponent()
     //CageFaces.Add(TArray<int>{18,25,16,9});
     //CageFaces.Add(TArray<int>{25,24,15,16});
     //CageFaces.Add(TArray<int>{16,15,7,8});
-//
+    //
     //CageFaces.Add(TArray<int>{15,14,6,7});
     //CageFaces.Add(TArray<int>{24,23,14,15});
     //CageFaces.Add(TArray<int>{23,22,13,14});
@@ -39,51 +39,60 @@ UMeshDeformerComponent::UMeshDeformerComponent()
     //CageFaces.Add(TArray<int>{22,21,12,13});
     //CageFaces.Add(TArray<int>{21,20,11,12});
     //CageFaces.Add(TArray<int>{12,11,3,4});
-//
+    //
     //CageFaces.Add(TArray<int>{11,10,2,3});
     //CageFaces.Add(TArray<int>{20,19,10,11});
     //CageFaces.Add(TArray<int>{19,18,9,10});
     //CageFaces.Add(TArray<int>{10,9,1,2});
 
-    CageFaces.Add(TArray<int>{0, 8, 1, 2});  // Face 1
-    CageFaces.Add(TArray<int>{0, 2, 3, 4});  // Face 2
-    CageFaces.Add(TArray<int>{0, 4, 5, 6});  // Face 3
-    CageFaces.Add(TArray<int>{0, 6, 7, 8});  // Face 4
+    //CageFaces.Add(TArray<int>{0, 8, 1, 2});  // Face 1
+    //CageFaces.Add(TArray<int>{0, 2, 3, 4});  // Face 2
+    //CageFaces.Add(TArray<int>{0, 4, 5, 6});  // Face 3
+    //CageFaces.Add(TArray<int>{0, 6, 7, 8});  // Face 4
 
-    // Side Faces (Connecting Bottom to Middle Layer)
-    CageFaces.Add(TArray<int>{10, 9, 1, 2});     // Face 5
-    CageFaces.Add(TArray<int>{11, 10, 2, 3});    // Face 6
-    CageFaces.Add(TArray<int>{12, 11, 3, 4});    // Face 7
-    CageFaces.Add(TArray<int>{13, 12, 4, 5});    // Face 8
-    CageFaces.Add(TArray<int>{14, 13, 5, 6});    // Face 9
-    CageFaces.Add(TArray<int>{15, 14, 6, 7});    // Face 10
-    CageFaces.Add(TArray<int>{16, 15, 7, 8});    // Face 11
-    CageFaces.Add(TArray<int>{9, 16, 8, 1});     // Face 12
-
-    // Middle Layer Faces
-    CageFaces.Add(TArray<int>{19, 18, 9, 10});   // Face 13
-    CageFaces.Add(TArray<int>{20, 19, 10, 11});  // Face 14
-    CageFaces.Add(TArray<int>{21, 20, 11, 12});  // Face 15
-    CageFaces.Add(TArray<int>{22, 21, 12, 13});  // Face 16
-    CageFaces.Add(TArray<int>{23, 22, 13, 14});  // Face 17
-    CageFaces.Add(TArray<int>{24, 23, 14, 15});  // Face 18
-    CageFaces.Add(TArray<int>{25, 24, 15, 16});  // Face 19
-    CageFaces.Add(TArray<int>{18, 25, 16, 9});   // Face 20
+    CageFaces.Add(TArray<int>{0, 7, 6, 5, 4, 3, 2, 1});
+    CageFaces.Add(TArray<int>{12, 13, 14, 9, 2, 1, 0, 8});
+    CageFaces.Add(TArray<int>{14, 15, 16, 10, 4, 3, 2, 9});
+    CageFaces.Add(TArray<int>{16, 17, 18, 11, 6, 5, 4, 10});
+    CageFaces.Add(TArray<int>{18, 19, 12, 8, 0, 7, 6, 11});
+    CageFaces.Add(TArray<int>{12, 13, 14, 15, 16, 17, 18, 19});
+    
+    //// Side Faces (Connecting Bottom to Middle Layer)
+    //CageFaces.Add(TArray<int>{10, 9, 1, 2});     // Face 5
+    //CageFaces.Add(TArray<int>{11, 10, 2, 3});    // Face 6
+    //CageFaces.Add(TArray<int>{12, 11, 3, 4});    // Face 7
+    //CageFaces.Add(TArray<int>{13, 12, 4, 5});    // Face 8
+    //CageFaces.Add(TArray<int>{14, 13, 5, 6});    // Face 9
+    //CageFaces.Add(TArray<int>{15, 14, 6, 7});    // Face 10
+    //CageFaces.Add(TArray<int>{16, 15, 7, 8});    // Face 11
+    //CageFaces.Add(TArray<int>{9, 16, 8, 1});     // Face 12
 //
-    //// Top Faces (Connecting Middle Layer to Top Point)
-    CageFaces.Add(TArray<int>{17, 19, 18, 25});      // Face 21
-    CageFaces.Add(TArray<int>{17, 21, 20, 19});      // Face 22
-    CageFaces.Add(TArray<int>{17, 23, 22, 21});      // Face 23
-    CageFaces.Add(TArray<int>{17, 25, 24, 23});      // Face 24
+    //// Middle Layer Faces
+    //CageFaces.Add(TArray<int>{19, 18, 9, 10});   // Face 13
+    //CageFaces.Add(TArray<int>{20, 19, 10, 11});  // Face 14
+    //CageFaces.Add(TArray<int>{21, 20, 11, 12});  // Face 15
+    //CageFaces.Add(TArray<int>{22, 21, 12, 13});  // Face 16
+    //CageFaces.Add(TArray<int>{23, 22, 13, 14});  // Face 17
+    //CageFaces.Add(TArray<int>{24, 23, 14, 15});  // Face 18
+    //CageFaces.Add(TArray<int>{25, 24, 15, 16});  // Face 19
+    //CageFaces.Add(TArray<int>{18, 25, 16, 9});   // Face 20
+////
+    ////// Top Faces (Connecting Middle Layer to Top Point)
+    //CageFaces.Add(TArray<int>{17, 19, 18, 25});      // Face 21
+    //CageFaces.Add(TArray<int>{17, 21, 20, 19});      // Face 22
+    //CageFaces.Add(TArray<int>{17, 23, 22, 21});      // Face 23
+    //CageFaces.Add(TArray<int>{17, 25, 24, 23});      // Face 24
 
     //for(int j = 0; j < 4; j++)
     //{
     //    CageFaces.Add(TArray<int>{CageFaces[j][0] + 17, CageFaces[j][1] + 17, CageFaces[j][2] + 17, CageFaces[j][3] + 17});
     //}
 
-    for(int j = 4; j <= 19; j++)
+    for(int j = 1; j <= 4; j++)
     {
-        CageFaces[j].Swap(1,3);
+        CageFaces[j].Swap(1,7);
+        CageFaces[j].Swap(2,6);
+        CageFaces[j].Swap(3,5);
     }
     
     TArray<UE::Math::TVector<double>> InCageVertices;
@@ -91,13 +100,14 @@ UMeshDeformerComponent::UMeshDeformerComponent()
     InCageVertices.Emplace(100.0, 100.0, -0.0);
     InCageVertices.Emplace(100.0, -100.0, -0.0);
     InCageVertices.Emplace(-100.0, -100.0, -0.0);
-    UE::Math::TVector<double> Center = FVector::ZeroVector;
-    for(int i = 0; i < 4; i++)
-    {
-        Center += InCageVertices[i];
-    }
-    Center /= 4.f;
-    InitialCageVertices.Add(Center);
+    
+    //UE::Math::TVector<double> Center = FVector::ZeroVector;
+    //for(int i = 0; i < 4; i++)
+    //{
+    //   Center += InCageVertices[i];
+    //}
+    //Center /= 4.f;
+    //InitialCageVertices.Add(Center);
     
     for(int k = 0; k < 3; k++)
     {
@@ -105,23 +115,18 @@ UMeshDeformerComponent::UMeshDeformerComponent()
         {
             for(int j = 0; j < 2; j++)
             {
-                InitialCageVertices.Add(InCageVertices[i] * (1.f - static_cast<double>(j) / 2.f) + InCageVertices[(i + 1) % InCageVertices.Num()] * (static_cast<double>(j) / 2.f) + UE::Math::TVector<double>(0.0, 0.0, (static_cast<double>(k) / 2.0) * 200.0));
-                if((InitialCageVertices.Num() - 1) % 2 == 0 && k <= 2)
+                if(k == 0 || k == 2)
+                    InitialCageVertices.Add(InCageVertices[i] * (1.f - static_cast<double>(j) / 2.f) + InCageVertices[(i + 1) % InCageVertices.Num()] * (static_cast<double>(j) / 2.f) + UE::Math::TVector<double>(0.0, 0.0, (static_cast<double>(k) / 2.0) * 200.0));
+                else
                 {
-                    UE::Math::TVector<double> Direction = InCageVertices[i] - InCageVertices[(i + 1) % InCageVertices.Num()];
-                    UE::Math::TVector<double> Normalized = Direction.GetSafeNormal(DBL_EPSILON);
-                    //InitialCageVertices.Last() += Normalized * 0.001 * i;
-                }
-                else if((InitialCageVertices.Num()) % 2 == 1 && k == 3)
-                {
-                    UE::Math::TVector<double> Direction = InCageVertices[i] - InCageVertices[(i + 1) % InCageVertices.Num()];
-                    UE::Math::TVector<double> Normalized = Direction.GetSafeNormal(DBL_EPSILON);
-                    //InitialCageVertices.Last() += Normalized * 0.001;
+                    InitialCageVertices.Add(InCageVertices[i] + UE::Math::TVector<double>(0.0, 0.0, 100.0));
+                    break;
                 }
             }
         }
     }
-    InitialCageVertices.Insert(Center + UE::Math::TVector<double>(0.0, 0.0, 200.0), 17);
+    
+    //InitialCageVertices.Insert(Center + UE::Math::TVector<double>(0.0, 0.0, 200.0), 17);
 }
 
 void UMeshDeformerComponent::BeginPlay()
@@ -231,7 +236,7 @@ void UMeshDeformerComponent::ComputeSMVCWeights(const FVector& Point, TArray<dou
 
     TMap<int, TArray<Out>> Outs;
     
-    TArray<int> IndicesToWatch = {};
+    TArray<int> IndicesToWatch = {8, 11};
     
     for(int f = 0; f < CageFaces.Num(); f++)
     {
@@ -251,7 +256,7 @@ void UMeshDeformerComponent::ComputeSMVCWeights(const FVector& Point, TArray<dou
 
         double Denominator = 0.0;
         TArray<double> Lambdas;
-        Lambdas.SetNumZeroed(CageFaces.Num());
+        Lambdas.SetNumZeroed(CageFaces[f].Num());
 
         for(int i = 0; i < CageFaces[f].Num(); i++)
         {
@@ -266,7 +271,7 @@ void UMeshDeformerComponent::ComputeSMVCWeights(const FVector& Point, TArray<dou
             double FaceMeanVectorSqrNorm = FaceMeanVector.SizeSquared();
             double VFNormDividedBySinTheTai = FaceMeanVectorSqrNorm;
             UE::Math::TVector<double> d;
-            if(FaceMeanVectorSqrNorm > Epsilon)// DBL_EPSILON)
+            if(FaceMeanVectorSqrNorm > DBL_EPSILON)// DBL_EPSILON)
             {
                 VFNormDividedBySinTheTai /= UE::Geometry::Cross(FaceMeanVector, Ui).Size();
             }
@@ -274,16 +279,16 @@ void UMeshDeformerComponent::ComputeSMVCWeights(const FVector& Point, TArray<dou
             UE::Math::TVector<double> Cross1 = UE::Geometry::Cross(FaceMeanVector, Ui);
             UE::Math::TVector<double> Cross2 = UE::Geometry::Cross(FaceMeanVector, UiPlus1);
 
-            UE::Math::TVector<double> Normal1 = (Cross1).GetSafeNormal(0.000000000000000000000000000000002325951644078309);
-            UE::Math::TVector<double> Normal2 = (Cross2).GetSafeNormal(0.000000000000000000000000000000002325951644078309);
+            UE::Math::TVector<double> Normal1 = (Cross1).GetSafeNormal(DBL_EPSILON);
+            UE::Math::TVector<double> Normal2 = (Cross2).GetSafeNormal(DBL_EPSILON);
             
             double TanAlphaIBy2 = GetTangentOfHalfAngleBetweenUnitVectors(Normal1, Normal2);
 
             UE::Math::TVector<double> Cross3 = UE::Geometry::Cross(FaceMeanVector, UiMinus1);
             UE::Math::TVector<double> Cross4 = UE::Geometry::Cross(FaceMeanVector, Ui);
 
-            UE::Math::TVector<double> Normal3 = (Cross3).GetSafeNormal(0.000000000000000000000000000000002325951644078309);
-            UE::Math::TVector<double> Normal4 = (Cross4).GetSafeNormal(0.000000000000000000000000000000002325951644078309);
+            UE::Math::TVector<double> Normal3 = (Cross3).GetSafeNormal(DBL_EPSILON);
+            UE::Math::TVector<double> Normal4 = (Cross4).GetSafeNormal(DBL_EPSILON);
             
             double TanAlphaMinusIBy2 = GetTangentOfHalfAngleBetweenUnitVectors(Normal3, Normal4);
 
@@ -292,25 +297,25 @@ void UMeshDeformerComponent::ComputeSMVCWeights(const FVector& Point, TArray<dou
                 TangentsSum = 9999999999.999999;
             Lambdas[i] = VFNormDividedBySinTheTai * TangentsSum / D[Vi];
             Denominator += TangentsSum * UE::Geometry::Dot(FaceMeanVector, Ui) / Cross1.Size();
-            if(false)//(IndicesToWatch.Contains(Vi) || f == 6 || f == 8) && Log1 && Log2)
-            {
-                
-                TArray<Out>& Array = Outs.FindOrAdd(Vi);
-                Array.Emplace(Vi, f, Lambdas[i], Denominator, FaceMeanVector, D[Vi], U[Vi]);
-                //if(f == 6 || f == 1) //(Vi == 4 || Vi == 5))// && (f == 4 || f == 12))
-                {
-                    UE_LOG(LogTemp, Warning, TEXT("OG Point: %s, Index: %d, Face: %d, Lambda: %f, Denominator: %f, Lambda/Denom: %f, FaceMeanVector: %s"), *Point.ToString(), Vi, f, Lambdas[i], Denominator, Lambdas[i] / Denominator, *FaceMeanVector.ToString());
-                    UE_LOG(LogTemp, Warning, TEXT("DistanceMinus1: %f, Distance: %f, DistancePlus1: %f"), D[ViMinus1], D[Vi], D[ViPlus1]);
-                    UE_LOG(LogTemp, Warning, TEXT("UMinus1: %s, U: %s, UPlus1: %s"), *U[ViMinus1].ToString(), *U[Vi].ToString(), *U[ViPlus1].ToString());
-                    UE_LOG(LogTemp, Warning, TEXT("VFNorm: %f"), VFNormDividedBySinTheTai);
-                    UE_LOG(LogTemp, Warning, TEXT("Cross1: %s, Normal1: %s"), *Cross1.ToString(), *Normal1.ToString());
-                    UE_LOG(LogTemp, Warning, TEXT("Cross2: %s, Normal2: %s"), *Cross2.ToString(), *Normal2.ToString());
-                    UE_LOG(LogTemp, Warning, TEXT("Cross3: %s, Normal3: %s"), *Cross3.ToString(), *Normal3.ToString());
-                    UE_LOG(LogTemp, Warning, TEXT("Cross4: %s, Normal4: %s"), *Cross4.ToString(), *Normal4.ToString());
-                    UE_LOG(LogTemp, Warning, TEXT("TanAplha1By2: %f, TanAlphaMinus1By2: %f"), TanAlphaIBy2, TanAlphaMinusIBy2);
-                    UE_LOG(LogTemp, Warning, TEXT(" "));
-                }
-            }
+            //if((IndicesToWatch.Contains(Vi)) && Log1 && Log2)
+            //{
+            //    
+            //    TArray<Out>& Array = Outs.FindOrAdd(Vi);
+            //    Array.Emplace(Vi, f, Lambdas[i], Denominator, FaceMeanVector, D[Vi], U[Vi]);
+            //    //if(f == 6 || f == 1) //(Vi == 4 || Vi == 5))// && (f == 4 || f == 12))
+            //    {
+            //        UE_LOG(LogTemp, Warning, TEXT("OG Point: %s, Index: %d, Face: %d, Lambda: %f, Denominator: %f, Lambda/Denom: %f, FaceMeanVector: %s"), *Point.ToString(), Vi, f, Lambdas[i], Denominator, Lambdas[i] / Denominator, *FaceMeanVector.ToString());
+            //        UE_LOG(LogTemp, Warning, TEXT("DistanceMinus1: %f, Distance: %f, DistancePlus1: %f"), D[ViMinus1], D[Vi], D[ViPlus1]);
+            //        UE_LOG(LogTemp, Warning, TEXT("UMinus1: %s, U: %s, UPlus1: %s"), *U[ViMinus1].ToString(), *U[Vi].ToString(), *U[ViPlus1].ToString());
+            //        UE_LOG(LogTemp, Warning, TEXT("VFNorm: %f"), VFNormDividedBySinTheTai);
+            //        UE_LOG(LogTemp, Warning, TEXT("Cross1: %s, Normal1: %s"), *Cross1.ToString(), *Normal1.ToString());
+            //        UE_LOG(LogTemp, Warning, TEXT("Cross2: %s, Normal2: %s"), *Cross2.ToString(), *Normal2.ToString());
+            //        UE_LOG(LogTemp, Warning, TEXT("Cross3: %s, Normal3: %s"), *Cross3.ToString(), *Normal3.ToString());
+            //        UE_LOG(LogTemp, Warning, TEXT("Cross4: %s, Normal4: %s"), *Cross4.ToString(), *Normal4.ToString());
+            //        UE_LOG(LogTemp, Warning, TEXT("TanAplha1By2: %f, TanAlphaMinus1By2: %f"), TanAlphaIBy2, TanAlphaMinusIBy2);
+            //        UE_LOG(LogTemp, Warning, TEXT(" "));
+            //    }
+            //}
         }
         //UE_LOG(LogTemp, Warning, TEXT(" "));
         if(fabs(Denominator) < DBL_EPSILON)// DBL_EPSILON)
@@ -342,7 +347,10 @@ void UMeshDeformerComponent::ComputeSMVCWeights(const FVector& Point, TArray<dou
             W_Weights[Vi] += Lambdai;
             SumWeights += Lambdai;
             //if(IndicesToWatch.Contains(Vi) && Log1 && Log2)
+            //{
             //    UE_LOG(LogTemp, Warning, TEXT("Index: %d, Lambda: %f, Denominator: %f, Lambda/Denom: %f, Weight: %f"), Vi, Lambdas[i], Denominator, Lambdai, W_Weights[Vi]);
+            //    UE_LOG(LogTemp, Warning, TEXT(" "));
+            //}
         }
     }
 
@@ -362,7 +370,7 @@ void UMeshDeformerComponent::ComputeSMVCWeights(const FVector& Point, TArray<dou
     {
         OutWeights[v] = W_Weights[v] / SumWeights;
         //if(IndicesToWatch.Contains(v) && Log1 && Log2)
-            //UE_LOG(LogTemp, Warning, TEXT("Index: %d, Weight: %f, NormalizedWeight: %f, SumWeights: %f"), v, W_Weights[v], OutWeights[v], SumWeights);
+        //   UE_LOG(LogTemp, Warning, TEXT("Index: %d, Weight: %f, NormalizedWeight: %f, SumWeights: %f"), v, W_Weights[v], OutWeights[v], SumWeights);
     }
     //UE_LOG(LogTemp, Warning, TEXT(" "));
 }
@@ -386,16 +394,16 @@ FVector UMeshDeformerComponent::ComputeSMVCCoordinate(const FVector& OriginalCoo
     for(int i = 0; i < CageVertices.Num(); i++)
     {
         DeformedCoordinate += Weights[i] * CageVertices[i];
-        if(Log1 && Log2)
+        //if(Log1 && Log2)
         //if(Log2)
-            UE_LOG(LogTemp, Warning, TEXT("Index: %d, Weight: %f, OG Cage Vertex: %s, Cage Vertex: %s, Influence: %s, Current Deformed Coordinate: %s"), i, Weights[i], *InitialCageVertices[i].ToString(), *CageVertices[i].ToString(), *(Weights[i] * CageVertices[i]).ToString(), *DeformedCoordinate.ToString());
+            //UE_LOG(LogTemp, Warning, TEXT("Index: %d, Weight: %f, OG Cage Vertex: %s, Cage Vertex: %s, Influence: %s, Current Deformed Coordinate: %s"), i, Weights[i], *InitialCageVertices[i].ToString(), *CageVertices[i].ToString(), *(Weights[i] * CageVertices[i]).ToString(), *DeformedCoordinate.ToString());
     }
-    if(Log2 && Log1)
-        UE_LOG(LogTemp, Error, TEXT("Index: %d, Name: %s, OG Coordinate: %s, DeformedCoord: %s"), CurrentPointIndex, *GetOwner()->GetName(), *OriginalCoordinate.ToString(), *DeformedCoordinate.ToString());
+    //if(Log2 && Log1)
+        //UE_LOG(LogTemp, Error, TEXT("Index: %d, Name: %s, OG Coordinate: %s, DeformedCoord: %s"), CurrentPointIndex, *GetOwner()->GetName(), *OriginalCoordinate.ToString(), *DeformedCoordinate.ToString());
     return DeformedCoordinate;
 }
 
-void UMeshDeformerComponent::DeformMesh(const TArray<FVector>& InCageVertices, const float InHeight)
+void UMeshDeformerComponent::DeformMesh(const TArray<UE::Math::TVector<double>>& InCageVertices, const float InHeight)
 {
     DeformedVertices.Empty();
     CageVertices.Empty();
@@ -407,7 +415,7 @@ void UMeshDeformerComponent::DeformMesh(const TArray<FVector>& InCageVertices, c
         Center += InCageVertices[i];
     }
     Center /= 4.f;
-    CageVertices.Add(Center - Center);
+    //CageVertices.Add(Center - Center);
     
     for(int k = 0; k < 3; k++)
     {
@@ -415,24 +423,32 @@ void UMeshDeformerComponent::DeformMesh(const TArray<FVector>& InCageVertices, c
         {
             for(int j = 0; j < 2; j++)
             {
-                CageVertices.Add(InCageVertices[i] * (1.f - static_cast<float>(j) / 2.f) + InCageVertices[(i + 1) % InCageVertices.Num()] * (static_cast<float>(j) / 2.f) + FVector(0.f, 0.f, (static_cast<float>(k) / 2.f) * InHeight) - Center);
+                if(k == 0 || k == 2)
+                    CageVertices.Add(InCageVertices[i] * (1.f - static_cast<float>(j) / 2.f) + InCageVertices[(i + 1) % InCageVertices.Num()] * (static_cast<float>(j) / 2.f) + FVector(0.f, 0.f, (static_cast<float>(k) / 2.f) * InHeight) - Center);
+                else
+                {
+                    CageVertices.Add(InCageVertices[i] + UE::Math::TVector<double>(0.0, 0.0, 100.0) - Center);
+                    break;
+                }
             }
         }
     }
-    CageVertices.Insert(FVector(0, 0, InHeight), 17);
+    //CageVertices.Insert(FVector(0, 0, InHeight), 17);
     
-    //FlushPersistentDebugLines(GetWorld());
-    //for(int i = 0; i < CageFaces.Num(); i++)
-    //{
-    //    for(int j = 0; j < CageFaces[i].Num(); j++)
-    //    {
-    //        DrawDebugLine(GetWorld(), CageVertices[CageFaces[i][j]], CageVertices[CageFaces[i][(j + 1) % CageFaces[i].Num()]], FColor::Green, false, 100.f, 0, 2.f);
-    //    }
-    //}
+    TArray<FColor> Colors = {FColor::Red, FColor::Green, FColor::Blue, FColor::Yellow, FColor::Purple, FColor::White};
+    
+    FlushPersistentDebugLines(GetWorld());
+    for(int i = 0; i < CageFaces.Num(); i++)
+    {
+        for(int j = 0; j < CageFaces[i].Num(); j++)
+        {
+            DrawDebugLine(GetWorld(), CageVertices[CageFaces[i][j]], CageVertices[CageFaces[i][(j + 1) % CageFaces[i].Num()]], Colors[i], false, 100.f, 0, 2.f);
+        }
+    }
     for(int i = 0; i < OriginalVertices.Num(); i++)
     {
         CurrentPointIndex = i;
-        if(i == 119)
+        if(i == 0)
             Log1 = true;
         else Log1 = false;
         DeformedVertices.Add(ComputeSMVCCoordinate(OriginalVertices[i]));

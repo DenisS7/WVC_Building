@@ -29,22 +29,22 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Mesh Deformer")
 	UStaticMesh* StaticMeshComp = nullptr;
 
-	TArray<FVector> OriginalVertices;
-	TArray<FVector> DeformedVertices;
+	TArray<UE::Math::TVector<double>> OriginalVertices;
+	TArray<UE::Math::TVector<double>> DeformedVertices;
 
 	TArray<int32> Triangles;
 	TArray<FVector> Normals;
 	TArray<FVector2D> UVs;
 	TArray<FProcMeshTangent> Tangents;
 	
-	TArray<FVector> InitialCageVertices;
-	TArray<FVector> CageVertices;
+	TArray<UE::Math::TVector<double>> InitialCageVertices;
+	TArray<UE::Math::TVector<double>> CageVertices;
 	TArray<TArray<int>> CageFaces;
 	void InitializeMeshData(const TArray<FVector>& InVertices, const TArray<int32>& InTriangles,
 							const TArray<FVector>& InNormals, const TArray<FVector2D>& InUVs,
 							const TArray<FProcMeshTangent>& InTangents);
 
-	void DeformMesh(const TArray<FVector>& InCageVertices, const float InHeight);
+	void DeformMesh(const TArray<UE::Math::TVector<double>>& InCageVertices, const float InHeight);
 private:
 	FVector ComputeSMVCCoordinate(const FVector& OriginalCoordinate);
 	void ComputeSMVCWeights(const FVector& Point, TArray<double>& OutWeights);
