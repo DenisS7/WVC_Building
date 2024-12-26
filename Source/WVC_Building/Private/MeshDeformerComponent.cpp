@@ -105,6 +105,7 @@ void UMeshDeformerComponent::ComputeSMVCWeights(const FVector& Point, TArray<dou
         }
         U[v] = (InitialCageVertices[v] - CorrectPoint) / D[v];
     }
+    
     struct Out
     {
         int Index = -1;
@@ -230,14 +231,6 @@ int CurrentPointIndex = -1;
 FVector UMeshDeformerComponent::ComputeSMVCCoordinate(const FVector& OriginalCoordinate)
 {
     TArray<double> Weights;
-    FString OwnerName = GetOwner()->GetName();
-    int32 Index = OwnerName.Len() - 1;
-    TCHAR LastChar = OwnerName[Index];
-    if(LastChar == '0')
-    {
-        Log2 = true;
-    }
-    else Log2 = false;
     ComputeSMVCWeights(OriginalCoordinate, Weights);
     UE::Math::TVector<double> DeformedCoordinate = FVector::ZeroVector;
     
@@ -290,9 +283,6 @@ void UMeshDeformerComponent::DeformMesh(const TArray<UE::Math::TVector<double>>&
     for(int i = 0; i < OriginalVertices.Num(); i++)
     {
         CurrentPointIndex = i;
-        if(i == 0)
-            Log1 = true;
-        else Log1 = false;
         DeformedVertices.Add(ComputeSMVCCoordinate(OriginalVertices[i]));
     }
     ProceduralMeshComp->CreateMeshSection(0, DeformedVertices, Triangles, Normals, UVs, TArray<FColor>(), Tangents, false);

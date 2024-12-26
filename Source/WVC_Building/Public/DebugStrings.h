@@ -45,7 +45,8 @@ UCLASS()
 class WVC_BUILDING_API UDebugStrings : public UDebugDrawComponent
 {
 	GENERATED_BODY()
-
+	
+public:
 	UDebugStrings(const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get());
 
 	virtual FDebugRenderSceneProxy* CreateDebugSceneProxy() override;

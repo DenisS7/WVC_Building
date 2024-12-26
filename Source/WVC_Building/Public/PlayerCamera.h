@@ -19,28 +19,46 @@ class WVC_BUILDING_API APlayerCamera : public APawn
 public:
 	// Sets default values for this pawn's properties
 	APlayerCamera();
-	UDataTable* DataTable;
-	AGridGenerator* HoveredGrid = nullptr;
+	
+	// Called every frame
+	virtual void Tick(float DeltaTime) override;
+	
+	// Called to bind functionality to input
+	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
+
 protected:
-	// Called when the game starts or when spawned
-	virtual void BeginPlay() override;
+	UPROPERTY(BlueprintReadWrite)
+	AGridGenerator* HoveredGrid = nullptr;
+
+	UPROPERTY(BlueprintReadWrite)
 	bool IsDragging = false;
+	
+	UPROPERTY(BlueprintReadWrite)
 	bool IsRotating = false;
+	
 	UPROPERTY(EditAnywhere)
 	float DraggingSpeed = 100.f;
+	
 	UPROPERTY(EditAnywhere)
 	float PanningSpeed = 3.f;
+	
 	UPROPERTY(EditAnywhere)
 	float RotationSpeed = 3.f;
+	
 	UPROPERTY(EditAnywhere)
 	float ZoomFactor = 200.f;
+	
 	UPROPERTY(EditAnywhere)
 	USpringArmComponent* SpringArm;
+	
 	UPROPERTY(EditAnywhere)
 	UCameraComponent* Camera;
 
-	FTimerHandle SquareHoverTimerHandle;
-	FTimerDelegate SquareHoverDelegate;
+	FTimerHandle MouseHoverTimerHandle;
+	FTimerDelegate MouseHoverDelegate;
+
+	// Called when the game starts or when spawned
+	virtual void BeginPlay() override;
 	
 	void OnLeftMouseButtonPressed();
 	void OnLeftMouseButtonReleased();
@@ -53,17 +71,4 @@ protected:
 
 	void DragCamera();
 	void RotatePanCamera();
-
-	UPROPERTY(EditAnywhere)
-	TMap<int, UStaticMesh*> GroundTiles;
-public:	
-	// Called every frame
-	virtual void Tick(float DeltaTime) override;
-
-	UPROPERTY(EditAnywhere)
-	TSubclassOf<ABuildingPiece> BuildingPieceToSpawn;
-	// Called to bind functionality to input
-	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
-
-
 };

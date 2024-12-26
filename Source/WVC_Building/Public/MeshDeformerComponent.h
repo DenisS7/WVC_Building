@@ -15,14 +15,6 @@ class WVC_BUILDING_API UMeshDeformerComponent : public UActorComponent
 	GENERATED_BODY()
 
 public:
-	UMeshDeformerComponent();
-	
-protected:
-	virtual void BeginPlay() override;
-	bool Log1 = false;
-	bool Log2 = false;
-	
-public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Mesh Deformer")
 	UProceduralMeshComponent* ProceduralMeshComp = nullptr;
 
@@ -40,12 +32,18 @@ public:
 	TArray<UE::Math::TVector<double>> InitialCageVertices;
 	TArray<UE::Math::TVector<double>> CageVertices;
 	TArray<TArray<int>> CageFaces;
+	
+	UMeshDeformerComponent();
+	
 	void InitializeMeshData(const TArray<FVector>& InVertices, const TArray<int32>& InTriangles,
 							const TArray<FVector>& InNormals, const TArray<FVector2D>& InUVs,
 							const TArray<FProcMeshTangent>& InTangents);
 
 	void DeformMesh(const TArray<UE::Math::TVector<double>>& InCageVertices, const float InHeight);
-private:
+
+protected:
+	virtual void BeginPlay() override;
+	
 	FVector ComputeSMVCCoordinate(const FVector& OriginalCoordinate);
 	void ComputeSMVCWeights(const FVector& Point, TArray<double>& OutWeights);
 	double GetAngleBetweenUnitVectors(const UE::Math::TVector<double>& U1, const UE::Math::TVector<double>& U2);

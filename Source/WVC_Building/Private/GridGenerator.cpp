@@ -3,14 +3,18 @@
 
 #include "GridGenerator.h"
 
+#include "BuildingPiece.h"
 #include "DebugStrings.h"
 #include "GridGeneratorVis.h"
+#include "MeshCornersData.h"
+#include "PlayerCamera.h"
 #include "Polygon2.h"
 #include "Components/DynamicMeshComponent.h"
 #include "Components/WidgetComponent.h"
 #include "Runtime/Core/Tests/Containers/TestUtils.h"
 #include "GeometryScript/MeshPrimitiveFunctions.h"
 #include "GeometryScript/MeshNormalsFunctions.h"
+#include "Kismet/GameplayStatics.h"
 
 // Sets default values
 AGridGenerator::AGridGenerator()
@@ -23,62 +27,100 @@ AGridGenerator::AGridGenerator()
 
 	WholeGridMesh = CreateDefaultSubobject<UDynamicMeshComponent>(TEXT("WholeGridMesh"));
 	HoveredShapeMesh = CreateDefaultSubobject<UDynamicMeshComponent>(TEXT("SelectedQuadMesh"));
-	//UDynamicMesh* Mesh = new UDynamicMesh();
-	//WholeGridMesh->SetDynamicMesh();	
-	Delegate1 = FTimerDelegate::CreateUObject(this, &AGridGenerator::Relax2);
-	Delegate2 = FTimerDelegate::CreateUObject(this, &AGridGenerator::Relax3);
-	Delegate3 = FTimerDelegate::CreateUObject(this, &AGridGenerator::CreateSecondGrid);
+
+	SecondRelaxDelegate = FTimerDelegate::CreateUObject(this, &AGridGenerator::Relax2);
+	ThirdRelaxDelegate = FTimerDelegate::CreateUObject(this, &AGridGenerator::Relax3);
+	CreateWholeGridMeshDelegate = FTimerDelegate::CreateUObject(this, &AGridGenerator::CreateWholeGridMesh);
+	CreateSecondGridDelegate = FTimerDelegate::CreateUObject(this, &AGridGenerator::CreateSecondGrid);
 }
 
 // Called when the game starts or when spawned
 void AGridGenerator::BeginPlay()
 {
 	Super::BeginPlay();
-	TArray<bool> Elevation;
-	for(int i = 0; i < GridPoints.Num(); i++)
-		Elevation.Add(false);
-	MarchingBits.Add(Elevation);
-	MarchingBits.Add(Elevation);
-	//for(int i = 0; i < FinalQuads.Num(); i++)
-	//{
-	//	FirstElevation.Emplace(i, 0);
-	//}
-	//VoxelConfig.Add(FirstElevation);
+
+	Elevations.Add(FElevationData(BaseGridPoints.Num()));
+	Elevations.Add(FElevationData(BaseGridPoints.Num()));
 }
 
-void AGridGenerator::GenerateHexCoordinates(const FVector& GridCenter, const float Size, const uint32 Index2)
+void AGridGenerator::OnConstruction(const FTransform& Transform)
 {
-	const uint32 NextIndex = Index2 + 1;
+	Super::OnConstruction(Transform);
+	
+	//FlushPersistentDebugLines(GetWorld());
+
+	FMath::RandInit(Seed);
+	FMath::SRandInit(Seed);
+	
+	GenerateGrid();
+}
+
+// Called every frame
+void AGridGenerator::Tick(float DeltaTime)
+{
+	Super::Tick(DeltaTime);
+}
+
+void AGridGenerator::GenerateGrid()
+{
+	BaseGridPoints.Empty();
+	BaseGridQuads.Empty();
+	DebugOnlyPerfectQuads.Empty();
+	Elevations.Empty();
+	
+	BaseGridCenter = GetActorLocation();
+	BaseGridPoints.Emplace(BaseGridPoints.Num(), BaseGridCenter);
+	for(uint32 i = 0; i < GridExtent - 1; i++)
+	{
+		GenerateHexCoordinates(BaseGridCenter, FirstHexSize * (i + 1), i);
+	}
+
+	TArray<FGridTriangle> Triangles = DivideGridIntoTriangles(BaseGridCenter);
+	DivideGridIntoQuads(BaseGridCenter, Triangles);
+	RelaxAndCreateSecondGrid();
+}
+
+void AGridGenerator::GenerateHexCoordinates(const FVector& GridCenter, const float HexSize, const uint32 HexIndex)
+{
+	const uint32 NextIndex = HexIndex + 1;
 	const uint32 NumPoints = 6 * NextIndex;
-	const int PrevNumPoints = GridPoints.Num();
-	GridPoints.SetNum(PrevNumPoints + NumPoints);
-	bool IsEdgePoint = (Index2 == GridSize - 2);
+	const int PrevNumPoints = BaseGridPoints.Num();
+	BaseGridPoints.SetNum(PrevNumPoints + NumPoints);
+	const bool IsEdgePoint = (HexIndex == GridExtent - 2);
+	
+	//Hex Corners
 	for(uint32 i = 0; i < 6; i++)
 	{
 		const float AngleRad = FMath::DegreesToRadians(60.f * i - 150.f);
-		GridPoints[PrevNumPoints+ i * NextIndex] = FGridPoint(PrevNumPoints+ i * NextIndex, FVector(GridCenter.X + Size * FMath::Cos(AngleRad), GridCenter.Y + Size * FMath::Sin(AngleRad), GridCenter.Z), IsEdgePoint);
+		BaseGridPoints[PrevNumPoints + i * NextIndex] = FGridPoint(PrevNumPoints + i * NextIndex,
+			FVector(GridCenter.X + HexSize * FMath::Cos(AngleRad), GridCenter.Y + HexSize * FMath::Sin(AngleRad), GridCenter.Z),
+			IsEdgePoint);
 	}
+
+	//Points on hex edges
 	const float FractionDistanceBetween = 1.f / static_cast<float>(NextIndex);
 	for(uint32 i = 0; i < 6; i++)
 	{
-		for(uint32 j = 0; j < Index2; j++)
+		for(uint32 j = 0; j < HexIndex; j++)
 		{
 			const int PointIndex = i * NextIndex + j + 1;
 			const float FractionDist = static_cast<float>(j + 1) * FractionDistanceBetween;
-			GridPoints[PrevNumPoints + PointIndex] = FGridPoint(PrevNumPoints + PointIndex,
-				FractionDist * GridPoints[PrevNumPoints + (((i + 1) % 6) * NextIndex)].Location +
-									(1.f - FractionDist) * GridPoints[PrevNumPoints + i * NextIndex].Location, IsEdgePoint);
+			BaseGridPoints[PrevNumPoints + PointIndex] = FGridPoint(PrevNumPoints + PointIndex,
+				FractionDist * BaseGridPoints[PrevNumPoints + (((i + 1) % 6) * NextIndex)].Location +
+				(1.f - FractionDist) * BaseGridPoints[PrevNumPoints + i * NextIndex].Location,
+				IsEdgePoint);
 		}
 	}
 }
 
-void AGridGenerator::DivideGridIntoTriangles(const FVector& GridCenter)
+TArray<FGridTriangle> AGridGenerator::DivideGridIntoTriangles(const FVector& GridCenter)
 {
-	if(!GridPoints.Num())
-		return;
+	TArray<FGridTriangle> Triangles;
+	if(!BaseGridPoints.Num())
+		return Triangles;
 
 	int TriangleIndex = 0;
-	for(uint32 i = 0; i < GridSize - 1; i++)
+	for(uint32 i = 0; i < GridExtent - 1; i++)
 	{
 		const int SmallMaxCoordinate = GetNumberOfPointsOnHex(i);
 		const int LargeMaxCoordinate = GetNumberOfPointsOnHex(i + 1);
@@ -90,7 +132,6 @@ void AGridGenerator::DivideGridIntoTriangles(const FVector& GridCenter)
 			bool LargeTriangle = true;
 			for(int k = 0; k < TrianglesPerSide; k++, LargeTriangle = !LargeTriangle)
 			{
-				//TArray<FIntPoint> TrianglePoints;
 				TArray<int>TrianglePointsIndices;
 				if(LargeTriangle)
 				{
@@ -108,7 +149,10 @@ void AGridGenerator::DivideGridIntoTriangles(const FVector& GridCenter)
 					
 					SmallCoordinate = (SmallCoordinate + 1) % SmallMaxCoordinate;
 				}
+				
 				TArray<int> Neighbours;
+
+				//Last triangle
 				if(j == 5 && k == TrianglesPerSide - 1)
 				{
 					Neighbours.Add(GetFirstTriangleIndexOnHex(i));
@@ -117,7 +161,9 @@ void AGridGenerator::DivideGridIntoTriangles(const FVector& GridCenter)
 				{
 					Neighbours.Add(TriangleIndex + 1);
 				}
-				if(j == 0 && k == 0) //first triangle
+				
+				//First triangle
+				if(j == 0 && k == 0)
 				{
 					Neighbours.Add(GetFirstTriangleIndexOnHex(i + 1) - 1);
 				}
@@ -125,9 +171,10 @@ void AGridGenerator::DivideGridIntoTriangles(const FVector& GridCenter)
 				{
 					Neighbours.Add(TriangleIndex - 1);
 				}
+				
 				if(k % 2 == 0)
 				{
-					if(GetFirstPointIndexOnHex(i + 3) < GridPoints.Num() - 1)
+					if(GetFirstPointIndexOnHex(i + 3) < BaseGridPoints.Num() - 1)
 						Neighbours.Add(TriangleIndex + 6 * (2 * i + 1) + 1 + 2 * j);
 				}
 				else
@@ -139,15 +186,18 @@ void AGridGenerator::DivideGridIntoTriangles(const FVector& GridCenter)
 			}
 		}
 	}
+	
+	return Triangles;
 }
 
-void AGridGenerator::DivideGridIntoQuads(const FVector& GridCenter)
+void AGridGenerator::DivideGridIntoQuads(const FVector& GridCenter, TArray<FGridTriangle>& Triangles)
 {
 	TArray<int> AvailableTriangles;
 	TArray<int> TrianglesLeft;
 	for(int i = 0; i < Triangles.Num(); i++)
 		AvailableTriangles.Add(i);
 	int QuadIndex = 0;
+	TArray<FGridQuad> Quads;
 	while(AvailableTriangles.Num())
 	{
 		const int RandomTriangle = AvailableTriangles[FMath::RandRange(0, AvailableTriangles.Num() - 1)];
@@ -187,27 +237,27 @@ void AGridGenerator::DivideGridIntoQuads(const FVector& GridCenter)
 		const TArray<int>& TrPoints = Triangles[TrianglesLeft[i]].Points;
 		FVector TriangleCenter = FVector::ZeroVector;
 		for(int j = 0; j < 3; j++)
-			TriangleCenter += GridPoints[Triangles[TrianglesLeft[i]].Points[j]].Location;
+			TriangleCenter += BaseGridPoints[Triangles[TrianglesLeft[i]].Points[j]].Location;
 		TriangleCenter /= 3.f;
 		TArray<int> TriangleMidpoints;
 		for(int j = 0; j < 3; j++)
 		{
-			TriangleMidpoints.Add(GetOrAddMidpointIndexInGrid1(Midpoints, TrPoints[j], TrPoints[(j + 1) % 3]));
+			TriangleMidpoints.Add(GetOrAddMidpointIndexInBaseGrid(Midpoints, TrPoints[j], TrPoints[(j + 1) % 3]));
 		}
-		GridPoints.Emplace(GridPoints.Num(), TriangleCenter);
+		BaseGridPoints.Emplace(BaseGridPoints.Num(), TriangleCenter);
 
-		TArray<int> Quad1Points = {TrPoints[0], TriangleMidpoints[0], GridPoints.Num() - 1, TriangleMidpoints[2]};
-		TArray<int> Quad2Points = {TrPoints[1], TriangleMidpoints[1], GridPoints.Num() - 1, TriangleMidpoints[0]};
-		TArray<int> Quad3Points = {TrPoints[2], TriangleMidpoints[2], GridPoints.Num() - 1, TriangleMidpoints[1]};
+		TArray<int> Quad1Points = {TrPoints[0], TriangleMidpoints[0], BaseGridPoints.Num() - 1, TriangleMidpoints[2]};
+		TArray<int> Quad2Points = {TrPoints[1], TriangleMidpoints[1], BaseGridPoints.Num() - 1, TriangleMidpoints[0]};
+		TArray<int> Quad3Points = {TrPoints[2], TriangleMidpoints[2], BaseGridPoints.Num() - 1, TriangleMidpoints[1]};
 		TArray<TArray<int>> QuadsPoints = {Quad1Points, Quad2Points, Quad3Points};
 		for(int j = 0; j < 3; j++)
 		{
-			FinalQuads.Add({QuadsPoints[j], FinalQuadIndex++});
-			SortQuadPoints(FinalQuads.Last());
-			FindPointNeighboursInQuad(FinalQuads.Num() - 1);
+			BaseGridQuads.Add({QuadsPoints[j], FinalQuadIndex++});
+			SortQuadPoints(BaseGridQuads.Last());
+			FindPointNeighboursInQuad(BaseGridQuads.Num() - 1);
 			for(int k = 0; k < QuadsPoints[j].Num(); k++)
 			{
-				GridPoints[QuadsPoints[j][k]].PartOfQuads.Add(FinalQuadIndex - 1);
+				BaseGridPoints[QuadsPoints[j][k]].PartOfQuads.Add(FinalQuadIndex - 1);
 			}
 		}
 	}
@@ -216,29 +266,29 @@ void AGridGenerator::DivideGridIntoQuads(const FVector& GridCenter)
 		TArray<int> QuadMidpoints;
 		for(int j = 0; j < 4; j++)
 		{
-			QuadMidpoints.Add(GetOrAddMidpointIndexInGrid1(Midpoints, Quads[i].Points[j], Quads[i].Points[(j + 1) % 4]));
+			QuadMidpoints.Add(GetOrAddMidpointIndexInBaseGrid(Midpoints, Quads[i].Points[j], Quads[i].Points[(j + 1) % 4]));
 		}
-		GridPoints.Emplace(GridPoints.Num(), Quads[i].Center);
+		BaseGridPoints.Emplace(BaseGridPoints.Num(), Quads[i].Center);
 		
-		TArray<int> Quad1Points = {Quads[i].Points[0], QuadMidpoints[0], GridPoints.Num() - 1, QuadMidpoints[3]};
-		TArray<int> Quad2Points = {Quads[i].Points[1], QuadMidpoints[1], GridPoints.Num() - 1, QuadMidpoints[0]};
-		TArray<int> Quad3Points = {Quads[i].Points[2], QuadMidpoints[2], GridPoints.Num() - 1, QuadMidpoints[1]};
-		TArray<int> Quad4Points = {Quads[i].Points[3], QuadMidpoints[3], GridPoints.Num() - 1, QuadMidpoints[2]};
+		TArray<int> Quad1Points = {Quads[i].Points[0], QuadMidpoints[0], BaseGridPoints.Num() - 1, QuadMidpoints[3]};
+		TArray<int> Quad2Points = {Quads[i].Points[1], QuadMidpoints[1], BaseGridPoints.Num() - 1, QuadMidpoints[0]};
+		TArray<int> Quad3Points = {Quads[i].Points[2], QuadMidpoints[2], BaseGridPoints.Num() - 1, QuadMidpoints[1]};
+		TArray<int> Quad4Points = {Quads[i].Points[3], QuadMidpoints[3], BaseGridPoints.Num() - 1, QuadMidpoints[2]};
 		TArray<TArray<int>> QuadsPoints = {Quad1Points, Quad2Points, Quad3Points, Quad4Points};
 		for(int j = 0; j < 4; j++)
 		{
-			FinalQuads.Add({QuadsPoints[j], FinalQuadIndex++});
-			SortQuadPoints(FinalQuads.Last());
-			FindPointNeighboursInQuad(FinalQuads.Num() - 1);
+			BaseGridQuads.Add({QuadsPoints[j], FinalQuadIndex++});
+			SortQuadPoints(BaseGridQuads.Last());
+			FindPointNeighboursInQuad(BaseGridQuads.Num() - 1);
 			for(int k = 0; k < QuadsPoints[j].Num(); k++)
 			{
-				GridPoints[QuadsPoints[j][k]].PartOfQuads.Add(FinalQuadIndex - 1);
+				BaseGridPoints[QuadsPoints[j][k]].PartOfQuads.Add(FinalQuadIndex - 1);
 			}
 		}
 	}
-	for(int i = 0; i < FinalQuads.Num() - 1; i++)
+	for(int i = 0; i < BaseGridQuads.Num() - 1; i++)
 	{
-		for(int j = i + 1; j < FinalQuads.Num(); j++)
+		for(int j = i + 1; j < BaseGridQuads.Num(); j++)
 		{
 			int CommonPoints = 0;
 			for(int k = 0; k < 4; k++)
@@ -246,12 +296,12 @@ void AGridGenerator::DivideGridIntoQuads(const FVector& GridCenter)
 				bool Found = false;
 				for(int p = 0; p < 4; p++)
 				{
-					if(FinalQuads[i].Points[k] == FinalQuads[j].Points[p])
+					if(BaseGridQuads[i].Points[k] == BaseGridQuads[j].Points[p])
 					{
 						if(++CommonPoints == 2)
 						{
-							FinalQuads[i].Neighbours.Add(j);
-							FinalQuads[j].Neighbours.Add(i);
+							BaseGridQuads[i].Neighbours.Add(j);
+							BaseGridQuads[j].Neighbours.Add(i);
 							Found = true;
 							break;
 						}
@@ -266,14 +316,473 @@ void AGridGenerator::DivideGridIntoQuads(const FVector& GridCenter)
 	}
 }
 
+void AGridGenerator::CreateWholeGridMesh()
+{
+	FGridShape WholeMeshShape;
+	for(int i = 0; i < BaseGridPoints.Num(); i++)
+	{
+		if(BaseGridPoints[i].IsEdge)
+			WholeMeshShape.Points.Add(i);
+	}
+	SortShapePoints(WholeMeshShape, false);
+	UE::Geometry::FPolygon2d MeshPolygon;
+	for(int i = 0; i < WholeMeshShape.Points.Num(); i++)
+	{
+		MeshPolygon.AppendVertex(UE::Math::TVector2(BaseGridPoints[WholeMeshShape.Points[i]].Location));
+	}
+	if(MeshPolygon.IsClockwise())
+		MeshPolygon.Reverse();
+	WholeGridMesh->GetDynamicMesh()->Reset();
+	float MeshHeight = 10.f;
+	FTransform MeshTransform = FTransform();
+	MeshTransform.SetLocation(FVector(MeshTransform.GetLocation().X, MeshTransform.GetLocation().Y, GetActorLocation().Z - MeshHeight));
+	UGeometryScriptLibrary_MeshPrimitiveFunctions::AppendSimpleExtrudePolygon(WholeGridMesh->GetDynamicMesh(),
+	FGeometryScriptPrimitiveOptions(),
+	MeshTransform,
+	MeshPolygon.GetVertices(),
+	MeshHeight,
+	5);
+	WholeGridMesh->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+	UBodySetup* BodySetup = WholeGridMesh->GetBodySetup();
+	BodySetup->CollisionTraceFlag = CTF_UseComplexAsSimple;
+	WholeGridMesh->EnableComplexAsSimpleCollision();;
+	BodySetup->AggGeom.ConvexElems.Empty();
+	BodySetup->CreatePhysicsMeshes(); 
+	WholeGridMesh->RecreatePhysicsState();
+	UGeometryScriptLibrary_MeshNormalsFunctions::ComputeSplitNormals(WholeGridMesh->GetDynamicMesh(), FGeometryScriptSplitNormalsOptions(), FGeometryScriptCalculateNormalsOptions());
+}
+
+void AGridGenerator::CreateShapeMesh(const int ShapeIndex)
+{
+	UE::Geometry::FPolygon2d MeshPolygon;
+	for(int i = 0; i < BuildingGridShapes[ShapeIndex].Points.Num(); i++)
+	{
+		MeshPolygon.AppendVertex(UE::Math::TVector2(BuildingGridPoints[BuildingGridShapes[ShapeIndex].Points[i]].Location));
+	}
+	if(MeshPolygon.IsClockwise())
+		MeshPolygon.Reverse();
+	HoveredShapeMesh->GetDynamicMesh()->Reset();
+	float MeshHeight = 10.f;
+	FTransform MeshTransform = FTransform();
+	MeshTransform.SetLocation(FVector(MeshTransform.GetLocation().X, MeshTransform.GetLocation().Y, GetActorLocation().Z - MeshHeight));
+	UGeometryScriptLibrary_MeshPrimitiveFunctions::AppendSimpleExtrudePolygon(HoveredShapeMesh->GetDynamicMesh(),
+	FGeometryScriptPrimitiveOptions(),
+	MeshTransform,
+	MeshPolygon.GetVertices(),
+	MeshHeight,
+	5);
+	HoveredShapeMesh->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+	UBodySetup* BodySetup = HoveredShapeMesh->GetBodySetup();
+	BodySetup->CollisionTraceFlag = CTF_UseComplexAsSimple;
+	HoveredShapeMesh->EnableComplexAsSimpleCollision();
+	BodySetup->AggGeom.ConvexElems.Empty();
+	BodySetup->CreatePhysicsMeshes(); 
+	HoveredShapeMesh->RecreatePhysicsState();
+	UGeometryScriptLibrary_MeshNormalsFunctions::ComputeSplitNormals(HoveredShapeMesh->GetDynamicMesh(), FGeometryScriptSplitNormalsOptions(), FGeometryScriptCalculateNormalsOptions());
+}
+
+void AGridGenerator::ResetShapeMesh()
+{
+	HoveredShapeMesh->GetDynamicMesh()->Reset();
+}
+
+void AGridGenerator::CreateSecondGrid()
+{
+	BuildingGridShapes.Empty();
+	BuildingGridPoints.Empty();
+	for(int i = 0; i < BaseGridQuads.Num(); i++)
+	{
+		bool IsEdge = false;
+		int EdgePoints = 0;
+		for(int j = 0; j < BaseGridQuads[i].Points.Num(); j++)
+		{
+			if(BaseGridPoints[BaseGridQuads[i].Points[j]].IsEdge)
+			{
+				EdgePoints++;
+				if(EdgePoints >= 2)
+				{
+					IsEdge = true;
+					break;
+				}
+			}
+		}
+		BuildingGridPoints.Emplace(i, BaseGridQuads[i].Center, IsEdge);
+	}
+	
+	int NeighbourOffset = 0;
+	for(int i = 0; i < BaseGridPoints.Num(); i++)
+	{
+		if(BaseGridPoints[i].IsEdge)
+		{
+			NeighbourOffset++;
+			continue;
+		}
+		TArray<int> ShapePoints;
+		for(int j = 0; j < BaseGridPoints[i].PartOfQuads.Num(); j++)
+		{
+			ShapePoints.Add(BaseGridPoints[i].PartOfQuads[j]);
+		}
+		BuildingGridShapes.Emplace(BuildingGridShapes.Num(), ShapePoints, i);
+		SortShapePoints(BuildingGridShapes.Last());
+	}
+	
+	for(int i = 0; i < BuildingGridShapes.Num() - 1; i++)
+	{
+		for(int j = i + 1; j < BuildingGridShapes.Num(); j++)
+		{
+			int CommonPoints = 0;
+			for(int k = 0; k < BuildingGridShapes[i].Points.Num(); k++)
+			{
+				bool Found = false;
+				for(int p = 0; p < BuildingGridShapes[j].Points.Num(); p++)
+				{
+					if(BuildingGridShapes[i].Points[k] == BuildingGridShapes[j].Points[p])
+					{
+						if(++CommonPoints == 2)
+						{
+							BuildingGridShapes[i].Neighbours.Add(j);
+							BuildingGridShapes[j].Neighbours.Add(i);
+							Found = true;
+							break;
+						}
+					}
+				}
+				if(Found)
+				{
+					break;
+				}
+			}
+		}
+	}
+}
+
+void AGridGenerator::RelaxGridBasedOnPerfectEqualSquare(const float SquareSideLength)
+{
+	if(Debug)
+	{
+		IterationsUsed1 = 0;
+		{
+			PerfectEqualSquareDelegate.BindWeakLambda(this, [this, SquareSideLength]()
+			{
+				if(IterationsUsed1 >= PerfectEqualSquareRelaxIterations)
+				{
+					GetWorld()->GetTimerManager().ClearTimer(PerfectEqualSquareTimerHandle);
+					PerfectEqualSquareTimerHandle.Invalidate();
+					return;
+				}
+				const float r = (SquareSideLength * sqrt(2.f)) / 2.f;
+				TArray<FVector> GridPointsForce;
+				GridPointsForce.SetNumZeroed(BaseGridPoints.Num());
+				DebugOnlyPerfectQuads.Empty();
+				for(int i = 0; i < BaseGridQuads.Num(); i++)
+				{
+					TArray<int>& QuadPoints = BaseGridQuads[i].Points;
+					FVector NewCenter = FVector::ZeroVector;
+					for(int j = 0; j < 4; j++)
+						NewCenter += BaseGridPoints[QuadPoints[j]].Location;
+					 NewCenter /= 4.f;
+					 BaseGridQuads[i].Center = NewCenter;
+					 float Alpha = 0.f;
+					 for(int k = 0; k <= 1; k++)
+					 {
+						 float Numerator = BaseGridPoints[QuadPoints[0]].Location.Y + BaseGridPoints[QuadPoints[1]].Location.X - BaseGridPoints[QuadPoints[2]].Location.Y - BaseGridPoints[QuadPoints[3]].Location.X;
+						  float Denominator = BaseGridPoints[QuadPoints[0]].Location.X - BaseGridPoints[QuadPoints[1]].Location.Y - BaseGridPoints[QuadPoints[2]].Location.X + BaseGridPoints[QuadPoints[3]].Location.Y;
+						  Alpha = FMath::Atan( Numerator / Denominator) + static_cast<float>(k) * PI;
+						  float SecondDerivative = 2.f * r * FMath::Cos(Alpha) * Denominator + 2.f * r * FMath::Sin(Alpha) * Numerator;
+						  if(SecondDerivative > 0.f)
+						  {
+							  break;
+						  }
+					 }
+					 TArray<FVector> SquarePoints;
+					 float CosAlpha = FMath::Cos(Alpha);
+					 float SinAlpha = FMath::Sin(Alpha);
+					 SquarePoints.Emplace(FVector(r * CosAlpha, r * SinAlpha, 0.f) + BaseGridQuads[i].Center);
+					 SquarePoints.Emplace(FVector(r * SinAlpha, -r * CosAlpha, 0.f) + BaseGridQuads[i].Center);
+					 SquarePoints.Emplace(FVector(-r * CosAlpha, -r * SinAlpha, 0.f) + BaseGridQuads[i].Center);
+					 SquarePoints.Emplace(FVector(-r * SinAlpha, r * CosAlpha, 0.f) + BaseGridQuads[i].Center);
+		
+					 for(int k = 0; k < 4; k++)
+					 {	
+						 FVector Diff = SquarePoints[k] - BaseGridPoints[QuadPoints[k]].Location;
+						 Diff.Z = 0.f;
+						 GridPointsForce[QuadPoints[k]] += Diff;
+					 }
+					 DebugOnlyPerfectQuads.Add(SquarePoints);
+				 }
+				 for(int i = 0; i < BaseGridPoints.Num(); i++)
+				 {
+					 BaseGridPoints[i].Location += GridPointsForce[i] * 0.1f;
+					 GridPointsForce[i] = FVector::ZeroVector;
+				 }
+				 DrawGrid();
+				 IterationsUsed1++;
+			 });
+		}
+		GetWorld()->GetTimerManager().SetTimer(PerfectEqualSquareTimerHandle, PerfectEqualSquareDelegate, Order1TimeRate, true);
+	}
+	else
+	{
+		for(uint32 Iteration = 0; Iteration < PerfectEqualSquareRelaxIterations; Iteration++)
+		{
+			const float r = (SquareSideLength * sqrt(2.f)) / 2.f;
+			TArray<FVector> GridPointsForce;
+			GridPointsForce.SetNumZeroed(BaseGridPoints.Num());
+			DebugOnlyPerfectQuads.Empty();
+			for(int i = 0; i < BaseGridQuads.Num(); i++)
+			{
+				TArray<int>& QuadPoints = BaseGridQuads[i].Points;
+				FVector NewCenter = FVector::ZeroVector;
+				for(int j = 0; j < 4; j++)
+					NewCenter += BaseGridPoints[QuadPoints[j]].Location;
+				NewCenter /= 4.f;
+				BaseGridQuads[i].Center = NewCenter;
+				float Alpha = 0.f;
+				for(int k = 0; k <= 1; k++)
+				{
+				 float Numerator = BaseGridPoints[QuadPoints[0]].Location.Y + BaseGridPoints[QuadPoints[1]].Location.X - BaseGridPoints[QuadPoints[2]].Location.Y - BaseGridPoints[QuadPoints[3]].Location.X;
+				  float Denominator = BaseGridPoints[QuadPoints[0]].Location.X - BaseGridPoints[QuadPoints[1]].Location.Y - BaseGridPoints[QuadPoints[2]].Location.X + BaseGridPoints[QuadPoints[3]].Location.Y;
+				  Alpha = FMath::Atan( Numerator / Denominator) + static_cast<float>(k) * PI;
+				  float SecondDerivative = 2.f * r * FMath::Cos(Alpha) * Denominator + 2.f * r * FMath::Sin(Alpha) * Numerator;
+				  if(SecondDerivative > 0.f)
+				  {
+					  break;
+				  }
+				}
+				TArray<FVector> SquarePoints;
+				float CosAlpha = FMath::Cos(Alpha);
+				float SinAlpha = FMath::Sin(Alpha);
+				SquarePoints.Emplace(FVector(r * CosAlpha, r * SinAlpha, 0.f) + BaseGridQuads[i].Center);
+				SquarePoints.Emplace(FVector(r * SinAlpha, -r * CosAlpha, 0.f) + BaseGridQuads[i].Center);
+				SquarePoints.Emplace(FVector(-r * CosAlpha, -r * SinAlpha, 0.f) + BaseGridQuads[i].Center);
+				SquarePoints.Emplace(FVector(-r * SinAlpha, r * CosAlpha, 0.f) + BaseGridQuads[i].Center);
+	
+				for(int k = 0; k < 4; k++)
+				{	
+				 FVector Diff = SquarePoints[k] - BaseGridPoints[QuadPoints[k]].Location;
+				 Diff.Z = 0.f;
+				 GridPointsForce[QuadPoints[k]] += Diff.GetSafeNormal();
+				}
+				DebugOnlyPerfectQuads.Add(SquarePoints);
+			 }
+			 for(int i = 0; i < BaseGridPoints.Num(); i++)
+			 {
+				 BaseGridPoints[i].Location += GridPointsForce[i];
+				 GridPointsForce[i] = FVector::ZeroVector;
+			 }
+			 //DrawGrid();
+		}
+	}
+}
+
+void AGridGenerator::RelaxGridBasedOnPerfectLocalSquare()
+{
+	IterationsUsed2 = 0;
+	if(Debug)
+	{
+		PerfectLocalSquareDelegate.BindWeakLambda(this, [this]()
+		{
+			if(IterationsUsed2 >= PerfectLocalSquareRelaxIterations)
+			{
+				GetWorld()->GetTimerManager().ClearTimer(PerfectLocalSquareTimerHandle);
+				PerfectLocalSquareTimerHandle.Invalidate();
+				return;
+			}
+			TArray<FVector> GridPointsForce;
+			GridPointsForce.SetNumZeroed(BaseGridPoints.Num());
+			for(int i = 0; i < BaseGridQuads.Num(); i++)
+			{
+				TArray<int>& QuadPoints = BaseGridQuads[i].Points;
+				FVector NewCenter = FVector::ZeroVector;
+				for(int j = 0; j < 4; j++)
+					NewCenter += BaseGridPoints[QuadPoints[j]].Location;
+				NewCenter /= 4.f;
+				BaseGridQuads[i].Center = NewCenter;
+				FVector QuadForce = FVector::ZeroVector;
+				for(int j = 0; j < 4; j++)
+				{
+					QuadForce += GetBasePointCoordinates(QuadPoints[j]) - NewCenter;
+					QuadForce = FVector(QuadForce.Y, -QuadForce.X, 0.f);
+				}
+				QuadForce /= 4.f;
+				for(int j = 0; j < 4; j++)
+				{
+					GridPointsForce[QuadPoints[j]] += NewCenter + QuadForce - GetBasePointCoordinates(QuadPoints[j]);
+					QuadForce = FVector(QuadForce.Y, -QuadForce.X, 0.f);
+				}
+			}
+			for(int i = 0; i < BaseGridPoints.Num(); i++)
+			{
+				BaseGridPoints[i].Location += GridPointsForce[i] * ForceScale;
+		   	}
+			DrawGrid();
+			IterationsUsed2++;
+		});
+		
+		GetWorld()->GetTimerManager().SetTimer(PerfectLocalSquareTimerHandle, PerfectLocalSquareDelegate, Order2TimeRate, true);
+	}
+	else
+	{
+		for(uint32 Iteration = 0; Iteration < PerfectLocalSquareRelaxIterations; Iteration++)
+		{
+			TArray<FVector> GridPointsForce;
+			GridPointsForce.SetNumZeroed(BaseGridPoints.Num());
+			for(int i = 0; i < BaseGridQuads.Num(); i++)
+			{
+				TArray<int>& QuadPoints = BaseGridQuads[i].Points;
+				FVector NewCenter = FVector::ZeroVector;
+				for(int j = 0; j < 4; j++)
+					NewCenter += BaseGridPoints[QuadPoints[j]].Location;
+				NewCenter /= 4.f;
+				BaseGridQuads[i].Center = NewCenter;
+				FVector QuadForce = FVector::ZeroVector;
+				for(int j = 0; j < 4; j++)
+				{
+					QuadForce += GetBasePointCoordinates(QuadPoints[j]) - NewCenter;
+					QuadForce = FVector(QuadForce.Y, -QuadForce.X, 0.f);
+				}
+				QuadForce /= 4.f;
+				for(int j = 0; j < 4; j++)
+				{
+					GridPointsForce[QuadPoints[j]] += NewCenter + QuadForce - GetBasePointCoordinates(QuadPoints[j]);
+					QuadForce = FVector(QuadForce.Y, -QuadForce.X, 0.f);
+				}
+			}
+			for(int i = 0; i < BaseGridPoints.Num(); i++)
+			{
+				BaseGridPoints[i].Location += GridPointsForce[i] * ForceScale;
+			}
+		}
+	}
+}
+
+void AGridGenerator::RelaxGridBasedOnNeighbours()
+{
+	for(uint32 Iteration = 0; Iteration < NeighbourRelaxIterations; Iteration++)
+	{
+		TArray<FGridPoint> NewGridPoints = BaseGridPoints;
+		NewGridPoints.SetNum(BaseGridPoints.Num());
+		for(int i = 0; i < BaseGridPoints.Num(); i++)
+		{
+			FVector Sum = FVector::ZeroVector;
+			for(int j = 0; j < BaseGridPoints[i].Neighbours.Num(); j++)
+			{
+				Sum += BaseGridPoints[BaseGridPoints[i].Neighbours[j]].Location;
+			}
+			NewGridPoints[i].Location = Sum / static_cast<float>(BaseGridPoints[i].Neighbours.Num());
+		}
+		BaseGridPoints = NewGridPoints;
+	}
+}
+
+void AGridGenerator::RelaxAndCreateSecondGrid()
+{
+	Relax1();
+	if(Debug)
+	{
+		uint32 It1 = 0;
+		if(PerfectEqualSquareOrder == 1)
+			It1 = PerfectEqualSquareRelaxIterations;
+		else if (PerfectLocalSquareOrder == 1)
+			It1 = PerfectLocalSquareRelaxIterations;
+		else if (NeighbourOrder == 1)
+			It1 = NeighbourRelaxIterations;
+		
+		uint32 It2 = 0;
+		if(PerfectEqualSquareOrder == 2)
+			It2 = PerfectEqualSquareRelaxIterations;
+		else if (PerfectLocalSquareOrder == 2)
+			It2 = PerfectLocalSquareRelaxIterations;
+		else if (NeighbourOrder == 2)
+			It2 = NeighbourRelaxIterations;
+	
+		uint32 It3 = 0;
+		if(PerfectEqualSquareOrder == 2)
+			It3 = PerfectEqualSquareRelaxIterations;
+		else if (PerfectLocalSquareOrder == 2)
+			It3 = PerfectLocalSquareRelaxIterations;
+		else if (NeighbourOrder == 2)
+			It3 = NeighbourRelaxIterations;
+		
+		const float TimerDuration1 = Order1TimeRate * (static_cast<float>(It1) + 1.f);
+		const float TimerDuration2 = TimerDuration1 + Order2TimeRate * (static_cast<float>(It2) + 1.f);
+		const float TimerDuration3 = TimerDuration2 + Order3TimeRate * (static_cast<float>(It3) + 1.f);
+		
+		GetWorld()->GetTimerManager().SetTimer(
+			SecondRelaxTimerHandle,
+			SecondRelaxDelegate,
+			TimerDuration1,
+			false,
+			TimerDuration1);
+		
+		GetWorld()->GetTimerManager().SetTimer(
+			ThirdRelaxTimerHandle,
+			ThirdRelaxDelegate,
+			TimerDuration2,
+			false,
+			TimerDuration2);
+		
+		GetWorld()->GetTimerManager().SetTimer(
+			CreateWholeGridMeshTimerHandle,
+			CreateWholeGridMeshDelegate,
+			TimerDuration3,
+			false,
+			TimerDuration3);
+
+		GetWorld()->GetTimerManager().SetTimer(
+			CreateSecondGridTimerHandle,
+			CreateSecondGridDelegate,
+			TimerDuration3 + 0.1f,
+			false,
+			TimerDuration3);
+	}
+	else
+	{
+		Relax2();
+		Relax3();
+		CreateWholeGridMesh();
+		CreateSecondGrid();
+	}
+}
+
+void AGridGenerator::Relax1()
+{
+	if(PerfectEqualSquareOrder == 1)
+		RelaxGridBasedOnPerfectEqualSquare(PerfectEqualSquareSize);
+	else if (PerfectLocalSquareOrder == 1)
+		RelaxGridBasedOnPerfectLocalSquare();
+	else if (NeighbourOrder == 1)
+		RelaxGridBasedOnNeighbours();
+}
+
+void AGridGenerator::Relax2()
+{
+	if(PerfectEqualSquareOrder == 2)
+		RelaxGridBasedOnPerfectEqualSquare(PerfectEqualSquareSize);
+	else if (PerfectLocalSquareOrder == 2)
+		RelaxGridBasedOnPerfectLocalSquare();
+	else if (NeighbourOrder == 2)
+		RelaxGridBasedOnNeighbours();
+}
+
+void AGridGenerator::Relax3()
+{
+	if(PerfectEqualSquareOrder == 3)
+		RelaxGridBasedOnPerfectEqualSquare(PerfectEqualSquareSize);
+	else if (PerfectLocalSquareOrder == 3)
+		RelaxGridBasedOnPerfectLocalSquare();
+	else if (NeighbourOrder == 3)
+		RelaxGridBasedOnNeighbours();
+}
+
 void AGridGenerator::FindPointNeighboursInQuad(const int QuadIndex)
 {
 	for(int i = 0; i < 4; i++)
 	{
 		const int PrevPoint = i - 1 < 0 ? 3 : 0;
 		const int NextPoint = (i + 1) % 4;
-		GridPoints[FinalQuads[QuadIndex].Points[i]].Neighbours.AddUnique(FinalQuads[QuadIndex].Points[PrevPoint]);
-		GridPoints[FinalQuads[QuadIndex].Points[i]].Neighbours.AddUnique(FinalQuads[QuadIndex].Points[NextPoint]);
+		BaseGridPoints[BaseGridQuads[QuadIndex].Points[i]].Neighbours.AddUnique(BaseGridQuads[QuadIndex].Points[PrevPoint]);
+		BaseGridPoints[BaseGridQuads[QuadIndex].Points[i]].Neighbours.AddUnique(BaseGridQuads[QuadIndex].Points[NextPoint]);
 	}
 }
 
@@ -281,7 +790,7 @@ void AGridGenerator::SortQuadPoints(FGridQuad& Quad)
 {
 	FVector QuadCenter = FVector::ZeroVector;
 	for(int i = 0; i < Quad.Points.Num(); i++)
-		QuadCenter += GridPoints[Quad.Points[i]].Location;
+		QuadCenter += BaseGridPoints[Quad.Points[i]].Location;
 	QuadCenter /= 4.f;
 	Quad.Center = QuadCenter;
 	struct FPointAngle
@@ -298,7 +807,7 @@ void AGridGenerator::SortQuadPoints(FGridQuad& Quad)
 	TArray<FPointAngle> Angles;
 	for(int i = 0; i < Quad.Points.Num(); i++)
 	{
-		const FVector& GridCoordinate = GridPoints[Quad.Points[i]].Location;
+		const FVector& GridCoordinate = BaseGridPoints[Quad.Points[i]].Location;
 		Angles.Add(FPointAngle(i, FMath::Atan2(GridCoordinate.Y - QuadCenter.Y, GridCoordinate.X - QuadCenter.X)));
 	}
 	Angles.Sort([](const FPointAngle& A, const FPointAngle& B)
@@ -315,7 +824,7 @@ void AGridGenerator::SortQuadPoints(FGridQuad& Quad)
 void AGridGenerator::SortShapePoints(FGridShape& Shape, const bool SecondGrid)
 {
 	FVector ShapeCenter = FVector::ZeroVector;
-	TArray<FGridPoint>& Points = SecondGrid ? SecondGridPoints : GridPoints;
+	TArray<FGridPoint>& Points = SecondGrid ? BuildingGridPoints : BaseGridPoints;
 	for(int i = 0; i < Shape.Points.Num(); i++)
 		ShapeCenter += Points[Shape.Points[i]].Location;
 	ShapeCenter /= static_cast<float>(Shape.Points.Num());
@@ -348,246 +857,7 @@ void AGridGenerator::SortShapePoints(FGridShape& Shape, const bool SecondGrid)
 	}
 }
 
-void AGridGenerator::RelaxGridBasedOnSquare(const float SquareSideLength)
-{
-	if(Debug)
-	{
-		IterationsUsed1 = 0;
-		{
-			SquareDelegate1.BindWeakLambda(this, [this, SquareSideLength]()
-			{
-				if(IterationsUsed1 >= Square1RelaxIterations)
-				{
-					GetWorld()->GetTimerManager().ClearTimer(SquareHandle1);
-					SquareHandle1.Invalidate();
-					return;
-				}
-				const float r = (SquareSideLength * sqrt(2.f)) / 2.f;
-				TArray<FVector> GridPointsForce;
-				GridPointsForce.SetNumZeroed(GridPoints.Num());
-				PerfectQuads.Empty();
-				for(int i = 0; i < FinalQuads.Num(); i++)
-				{
-					TArray<int>& QuadPoints = FinalQuads[i].Points;
-					FVector NewCenter = FVector::ZeroVector;
-					for(int j = 0; j < 4; j++)
-						NewCenter += GridPoints[QuadPoints[j]].Location;
-					 NewCenter /= 4.f;
-					 FinalQuads[i].Center = NewCenter;
-					 float Alpha = 0.f;
-					 for(int k = 0; k <= 1; k++)
-					 {
-						 float Numerator = GridPoints[QuadPoints[0]].Location.Y + GridPoints[QuadPoints[1]].Location.X - GridPoints[QuadPoints[2]].Location.Y - GridPoints[QuadPoints[3]].Location.X;
-						  float Denominator = GridPoints[QuadPoints[0]].Location.X - GridPoints[QuadPoints[1]].Location.Y - GridPoints[QuadPoints[2]].Location.X + GridPoints[QuadPoints[3]].Location.Y;
-						  Alpha = FMath::Atan( Numerator / Denominator) + static_cast<float>(k) * PI;
-						  float SecondDerivative = 2.f * r * FMath::Cos(Alpha) * Denominator + 2.f * r * FMath::Sin(Alpha) * Numerator;
-						  if(SecondDerivative > 0.f)
-						  {
-							  break;
-						  }
-					 }
-					 TArray<FVector> SquarePoints;
-					 float CosAlpha = FMath::Cos(Alpha);
-					 float SinAlpha = FMath::Sin(Alpha);
-					 SquarePoints.Emplace(FVector(r * CosAlpha, r * SinAlpha, 0.f) + FinalQuads[i].Center);
-					 SquarePoints.Emplace(FVector(r * SinAlpha, -r * CosAlpha, 0.f) + FinalQuads[i].Center);
-					 SquarePoints.Emplace(FVector(-r * CosAlpha, -r * SinAlpha, 0.f) + FinalQuads[i].Center);
-					 SquarePoints.Emplace(FVector(-r * SinAlpha, r * CosAlpha, 0.f) + FinalQuads[i].Center);
-		
-					 for(int k = 0; k < 4; k++)
-					 {	
-						 FVector Diff = SquarePoints[k] - GridPoints[QuadPoints[k]].Location;
-						 Diff.Z = 0.f;
-						 GridPointsForce[QuadPoints[k]] += Diff;
-					 }
-					 PerfectQuads.Add(SquarePoints);
-				 }
-				 for(int i = 0; i < GridPoints.Num(); i++)
-				 {
-					 GridPoints[i].Location += GridPointsForce[i] * 0.1f;
-					 GridPointsForce[i] = FVector::ZeroVector;
-				 }
-				 DrawGrid();
-				 IterationsUsed1++;
-			 });
-		}
-		GetWorld()->GetTimerManager().SetTimer(SquareHandle1, SquareDelegate1, Order1TimeRate, true);
-	}
-	else
-	{
-		for(uint32 Iteration = 0; Iteration < Square1RelaxIterations; Iteration++)
-		{
-			const float r = (SquareSideLength * sqrt(2.f)) / 2.f;
-			TArray<FVector> GridPointsForce;
-			GridPointsForce.SetNumZeroed(GridPoints.Num());
-			PerfectQuads.Empty();
-			for(int i = 0; i < FinalQuads.Num(); i++)
-			{
-				TArray<int>& QuadPoints = FinalQuads[i].Points;
-				FVector NewCenter = FVector::ZeroVector;
-				for(int j = 0; j < 4; j++)
-					NewCenter += GridPoints[QuadPoints[j]].Location;
-				NewCenter /= 4.f;
-				FinalQuads[i].Center = NewCenter;
-				float Alpha = 0.f;
-				for(int k = 0; k <= 1; k++)
-				{
-				 float Numerator = GridPoints[QuadPoints[0]].Location.Y + GridPoints[QuadPoints[1]].Location.X - GridPoints[QuadPoints[2]].Location.Y - GridPoints[QuadPoints[3]].Location.X;
-				  float Denominator = GridPoints[QuadPoints[0]].Location.X - GridPoints[QuadPoints[1]].Location.Y - GridPoints[QuadPoints[2]].Location.X + GridPoints[QuadPoints[3]].Location.Y;
-				  Alpha = FMath::Atan( Numerator / Denominator) + static_cast<float>(k) * PI;
-				  float SecondDerivative = 2.f * r * FMath::Cos(Alpha) * Denominator + 2.f * r * FMath::Sin(Alpha) * Numerator;
-				  if(SecondDerivative > 0.f)
-				  {
-					  break;
-				  }
-				}
-				TArray<FVector> SquarePoints;
-				float CosAlpha = FMath::Cos(Alpha);
-				float SinAlpha = FMath::Sin(Alpha);
-				SquarePoints.Emplace(FVector(r * CosAlpha, r * SinAlpha, 0.f) + FinalQuads[i].Center);
-				SquarePoints.Emplace(FVector(r * SinAlpha, -r * CosAlpha, 0.f) + FinalQuads[i].Center);
-				SquarePoints.Emplace(FVector(-r * CosAlpha, -r * SinAlpha, 0.f) + FinalQuads[i].Center);
-				SquarePoints.Emplace(FVector(-r * SinAlpha, r * CosAlpha, 0.f) + FinalQuads[i].Center);
-	
-				for(int k = 0; k < 4; k++)
-				{	
-				 FVector Diff = SquarePoints[k] - GridPoints[QuadPoints[k]].Location;
-				 Diff.Z = 0.f;
-				 GridPointsForce[QuadPoints[k]] += Diff.GetSafeNormal();
-				}
-				PerfectQuads.Add(SquarePoints);
-			 }
-			 for(int i = 0; i < GridPoints.Num(); i++)
-			 {
-				 GridPoints[i].Location += GridPointsForce[i];
-				 GridPointsForce[i] = FVector::ZeroVector;
-			 }
-			 //DrawGrid();
-		}
-	}
-}
-
-void AGridGenerator::RelaxGridBasedOnSquare2()
-{
-	IterationsUsed2 = 0;
-	if(Debug)
-	{
-		SquareDelegate2.BindWeakLambda(this, [this]()
-		{
-			if(IterationsUsed2 >= Square2RelaxIterations)
-			{
-				GetWorld()->GetTimerManager().ClearTimer(SquareHandle2);
-				SquareHandle2.Invalidate();
-				return;
-			}
-			TArray<FVector> GridPointsForce;
-			GridPointsForce.SetNumZeroed(GridPoints.Num());
-			for(int i = 0; i < FinalQuads.Num(); i++)
-			{
-				TArray<int>& QuadPoints = FinalQuads[i].Points;
-				FVector NewCenter = FVector::ZeroVector;
-				for(int j = 0; j < 4; j++)
-					NewCenter += GridPoints[QuadPoints[j]].Location;
-				NewCenter /= 4.f;
-				FinalQuads[i].Center = NewCenter;
-				FVector QuadForce = FVector::ZeroVector;
-				for(int j = 0; j < 4; j++)
-				{
-					QuadForce += GetPointCoordinates(QuadPoints[j]) - NewCenter;
-					QuadForce = FVector(QuadForce.Y, -QuadForce.X, 0.f);
-				}
-				QuadForce /= 4.f;
-				for(int j = 0; j < 4; j++)
-				{
-					GridPointsForce[QuadPoints[j]] += NewCenter + QuadForce - GetPointCoordinates(QuadPoints[j]);
-					QuadForce = FVector(QuadForce.Y, -QuadForce.X, 0.f);
-				}
-			}
-			for(int i = 0; i < GridPoints.Num(); i++)
-			{
-				GridPoints[i].Location += GridPointsForce[i] * ForceScale;
-		   	}
-			DrawGrid();
-			IterationsUsed2++;
-		});
-		
-		GetWorld()->GetTimerManager().SetTimer(SquareHandle2, SquareDelegate2, Order2TimeRate, true);
-	}
-	else
-	{
-		for(uint32 Iteration = 0; Iteration < Square2RelaxIterations; Iteration++)
-		{
-			TArray<FVector> GridPointsForce;
-			GridPointsForce.SetNumZeroed(GridPoints.Num());
-			for(int i = 0; i < FinalQuads.Num(); i++)
-			{
-				TArray<int>& QuadPoints = FinalQuads[i].Points;
-				FVector NewCenter = FVector::ZeroVector;
-				for(int j = 0; j < 4; j++)
-					NewCenter += GridPoints[QuadPoints[j]].Location;
-				NewCenter /= 4.f;
-				FinalQuads[i].Center = NewCenter;
-				FVector QuadForce = FVector::ZeroVector;
-				for(int j = 0; j < 4; j++)
-				{
-					QuadForce += GetPointCoordinates(QuadPoints[j]) - NewCenter;
-					QuadForce = FVector(QuadForce.Y, -QuadForce.X, 0.f);
-				}
-				QuadForce /= 4.f;
-				for(int j = 0; j < 4; j++)
-				{
-					GridPointsForce[QuadPoints[j]] += NewCenter + QuadForce - GetPointCoordinates(QuadPoints[j]);
-					QuadForce = FVector(QuadForce.Y, -QuadForce.X, 0.f);
-				}
-			}
-			for(int i = 0; i < GridPoints.Num(); i++)
-			{
-				GridPoints[i].Location += GridPointsForce[i] * ForceScale;
-			}
-		}
-	}
-}
-
-void AGridGenerator::RelaxGridBasedOnNeighbours()
-{
-	for(uint32 Iteration = 0; Iteration < NeighbourRelaxIterations; Iteration++)
-	{
-		TArray<FGridPoint> NewGridPoints = GridPoints;
-		NewGridPoints.SetNum(GridPoints.Num());
-		for(int i = 0; i < GridPoints.Num(); i++)
-		{
-			FVector Sum = FVector::ZeroVector;
-			for(int j = 0; j < GridPoints[i].Neighbours.Num(); j++)
-			{
-				Sum += GridPoints[GridPoints[i].Neighbours[j]].Location;
-			}
-			NewGridPoints[i].Location = Sum / static_cast<float>(GridPoints[i].Neighbours.Num());
-		}
-		GridPoints = NewGridPoints;
-	}
-}
-
-void AGridGenerator::Relax2()
-{
-	if(Square1Order == 2)
-		RelaxGridBasedOnSquare(SquareSize);
-	else if (Square2Order == 2)
-		RelaxGridBasedOnSquare2();
-	else if (NeighbourOrder == 2)
-		RelaxGridBasedOnNeighbours();
-}
-
-void AGridGenerator::Relax3()
-{
-	if(Square1Order == 3)
-		RelaxGridBasedOnSquare(SquareSize);
-	else if (Square2Order == 3)
-		RelaxGridBasedOnSquare2();
-	else if (NeighbourOrder == 3)
-		RelaxGridBasedOnNeighbours();
-}
-
-int AGridGenerator::GetOrAddMidpointIndexInGrid1(TMap<TPair<int, int>, int>& Midpoints, int Point1, int Point2)
+int AGridGenerator::GetOrAddMidpointIndexInBaseGrid(TMap<TPair<int, int>, int>& Midpoints, int Point1, int Point2)
 {
 	if(Point1 > Point2)
 		std::swap(Point1, Point2);
@@ -596,117 +866,10 @@ int AGridGenerator::GetOrAddMidpointIndexInGrid1(TMap<TPair<int, int>, int>& Mid
 	{
 		return Midpoints[Key];
 	}
-	const bool IsEdgePoint = (GridPoints[Point1].IsEdge && GridPoints[Point2].IsEdge);
-	GridPoints.Emplace(GridPoints.Num(), (GridPoints[Point1].Location + GridPoints[Point2].Location) / 2.f, IsEdgePoint);
-	//Midpoints[Key] = GridPoints.Num() - 1;
-	Midpoints.Add(Key, GridPoints.Num() - 1);
+	const bool IsEdgePoint = (BaseGridPoints[Point1].IsEdge && BaseGridPoints[Point2].IsEdge);
+	BaseGridPoints.Emplace(BaseGridPoints.Num(), (BaseGridPoints[Point1].Location + BaseGridPoints[Point2].Location) / 2.f, IsEdgePoint);
+	Midpoints.Add(Key, BaseGridPoints.Num() - 1);
 	return Midpoints[Key];
-}
-
-void AGridGenerator::CreateSecondGrid()
-{
-	SecondGridShapes.Empty();
-	SecondGridPoints.Empty();
-	for(int i = 0; i < FinalQuads.Num(); i++)
-	{
-		bool IsEdge = false;
-		int EdgePoints = 0;
-		for(int j = 0; j < FinalQuads[i].Points.Num(); j++)
-		{
-			if(GridPoints[FinalQuads[i].Points[j]].IsEdge)
-			{
-				EdgePoints++;
-				if(EdgePoints >= 2)
-				{
-					IsEdge = true;
-					break;
-				}
-			}
-		}
-		SecondGridPoints.Emplace(i, FinalQuads[i].Center, IsEdge);
-	}
-	
-	int NeighbourOffset = 0;
-	for(int i = 0; i < GridPoints.Num(); i++)
-	{
-		if(GridPoints[i].IsEdge)
-		{
-			NeighbourOffset++;
-			continue;
-		}
-		TArray<int> ShapePoints;
-		for(int j = 0; j < GridPoints[i].PartOfQuads.Num(); j++)
-		{
-			ShapePoints.Add(GridPoints[i].PartOfQuads[j]);
-		}
-		SecondGridShapes.Emplace(SecondGridShapes.Num(), ShapePoints, i);
-		SortShapePoints(SecondGridShapes.Last());
-	}
-	
-	for(int i = 0; i < SecondGridShapes.Num() - 1; i++)
-	{
-		for(int j = i + 1; j < SecondGridShapes.Num(); j++)
-		{
-			int CommonPoints = 0;
-			for(int k = 0; k < SecondGridShapes[i].Points.Num(); k++)
-			{
-				bool Found = false;
-				for(int p = 0; p < SecondGridShapes[j].Points.Num(); p++)
-				{
-					if(SecondGridShapes[i].Points[k] == SecondGridShapes[j].Points[p])
-					{
-						if(++CommonPoints == 2)
-						{
-							SecondGridShapes[i].Neighbours.Add(j);
-							SecondGridShapes[j].Neighbours.Add(i);
-							Found = true;
-							break;
-						}
-					}
-				}
-				if(Found)
-				{
-					break;
-				}
-			}
-		}
-	}
-}
-
-void AGridGenerator::CreateWholeGridMesh()
-{
-	FGridShape WholeMeshShape;
-	for(int i = 0; i < GridPoints.Num(); i++)
-	{
-		if(GridPoints[i].IsEdge)
-			WholeMeshShape.Points.Add(i);
-	}
-	SortShapePoints(WholeMeshShape, false);
-	UE::Geometry::FPolygon2d MeshPolygon;
-	for(int i = 0; i < WholeMeshShape.Points.Num(); i++)
-	{
-		MeshPolygon.AppendVertex(UE::Math::TVector2(GridPoints[WholeMeshShape.Points[i]].Location));
-	}
-	if(MeshPolygon.IsClockwise())
-		MeshPolygon.Reverse();
-	WholeGridMesh->GetDynamicMesh()->Reset();
-	float MeshHeight = 10.f;
-	FTransform MeshTransform = FTransform();
-	MeshTransform.SetLocation(FVector(MeshTransform.GetLocation().X, MeshTransform.GetLocation().Y, GetActorLocation().Z - MeshHeight));
-	UGeometryScriptLibrary_MeshPrimitiveFunctions::AppendSimpleExtrudePolygon(WholeGridMesh->GetDynamicMesh(),
-	FGeometryScriptPrimitiveOptions(),
-	MeshTransform,
-	MeshPolygon.GetVertices(),
-	MeshHeight,
-	5);
-	WholeGridMesh->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
-	UBodySetup* BodySetup = WholeGridMesh->GetBodySetup();
-	BodySetup->CollisionTraceFlag = CTF_UseComplexAsSimple;
-	WholeGridMesh->EnableComplexAsSimpleCollision();;
-	BodySetup->AggGeom.ConvexElems.Empty();
-	BodySetup->CreatePhysicsMeshes(); 
-	WholeGridMesh->RecreatePhysicsState();
-	UGeometryScriptLibrary_MeshNormalsFunctions::ComputeSplitNormals(WholeGridMesh->GetDynamicMesh(), FGeometryScriptSplitNormalsOptions(), FGeometryScriptCalculateNormalsOptions());
 }
 
 bool AGridGenerator::IsPointInShape(const FVector& Point, const FGridShape& Shape) const
@@ -716,10 +879,10 @@ bool AGridGenerator::IsPointInShape(const FVector& Point, const FGridShape& Shap
 			   (P2.X - P3.X) * (P1.Y - P3.Y);
 	};
 
-	const bool SameSide1 = Sign(Point, GetSecondPointCoordinates(Shape.Points[0]), GetSecondPointCoordinates(Shape.Points[1])) > 0;
+	const bool SameSide1 = Sign(Point, GetBuildingPointCoordinates(Shape.Points[0]), GetBuildingPointCoordinates(Shape.Points[1])) > 0;
 	for(int i = 1; i < Shape.Points.Num(); i++)
 	{
-		const bool SameSide2 = Sign(Point, GetSecondPointCoordinates(Shape.Points[i]), GetSecondPointCoordinates(Shape.Points[(i + 1) % Shape.Points.Num()])) > 0;
+		const bool SameSide2 = Sign(Point, GetBuildingPointCoordinates(Shape.Points[i]), GetBuildingPointCoordinates(Shape.Points[(i + 1) % Shape.Points.Num()])) > 0;
 		if(SameSide1 != SameSide2)
 			return false;
 	}
@@ -730,13 +893,13 @@ bool AGridGenerator::IsPointInShape(const FVector& Point, const FGridShape& Shap
 int AGridGenerator::DetermineWhichGridShapeAPointIsIn(const FVector& Point)
 {
 	TArray<bool> Visited;
-	Visited.SetNumZeroed(SecondGridShapes.Num());
+	Visited.SetNumZeroed(BuildingGridShapes.Num());
 	int CurrentShape = 0;
 	int VisitedQuadNumber = 0;
 
-	while(VisitedQuadNumber < SecondGridShapes.Num())
+	while(VisitedQuadNumber < BuildingGridShapes.Num())
 	{
-		if(IsPointInShape(Point, SecondGridShapes[CurrentShape]))
+		if(IsPointInShape(Point, BuildingGridShapes[CurrentShape]))
 		{
 			return CurrentShape;
 		}
@@ -747,12 +910,12 @@ int AGridGenerator::DetermineWhichGridShapeAPointIsIn(const FVector& Point)
 		float ClosestNeighbourDistance = FLT_MAX;
 		int ClosestNeighbour = -1;
 
-		for(int i = 0; i < SecondGridShapes[CurrentShape].Neighbours.Num(); i++)
+		for(int i = 0; i < BuildingGridShapes[CurrentShape].Neighbours.Num(); i++)
 		{
-			const int NeighbourIndex = SecondGridShapes[CurrentShape].Neighbours[i];
+			const int NeighbourIndex = BuildingGridShapes[CurrentShape].Neighbours[i];
 			if(Visited[NeighbourIndex])
 				continue;
-			const float DistanceBetween = FVector::DistSquared2D(Point, SecondGridShapes[NeighbourIndex].Center);
+			const float DistanceBetween = FVector::DistSquared2D(Point, BuildingGridShapes[NeighbourIndex].Center);
 			if(DistanceBetween < ClosestNeighbourDistance)
 			{
 				ClosestNeighbourDistance = DistanceBetween;
@@ -769,80 +932,62 @@ int AGridGenerator::DetermineWhichGridShapeAPointIsIn(const FVector& Point)
 	return -1;
 }
 
-// Called every frame
-void AGridGenerator::Tick(float DeltaTime)
-{
-	Super::Tick(DeltaTime);
-}
-
-void AGridGenerator::OnConstruction(const FTransform& Transform)
-{
-	Super::OnConstruction(Transform);
-	
-	//FlushPersistentDebugLines(GetWorld());
-
-	FMath::RandInit(Seed);
-	FMath::SRandInit(Seed);
-	
-	GenerateGrid();
-}
-
 void AGridGenerator::DrawGrid()
 {
 	FlushPersistentDebugLines(GetWorld());
-	for(int i = 0; i < FinalQuads.Num(); i++)
+	for(int i = 0; i < BaseGridQuads.Num(); i++)
 	{
-		if(FinalQuads[i].Index == -1)
+		if(BaseGridQuads[i].Index == -1)
 			continue;
 		FLinearColor Color = FColor::Red;
 		FLinearColor Color2 = FColor::Green;
 		FLinearColor Color3 = FColor::Blue;
 		FLinearColor Color4 = FColor::Yellow;
-		if(ShowGrid)
+		if(ShowBaseGrid)
 		{
 			float LineThickness = 2.f;
 			DrawDebugLine(GetWorld(), 
-			GetPointCoordinates(FinalQuads[i].Points[0]),
-				GetPointCoordinates(FinalQuads[i].Points[1]),
+			GetBasePointCoordinates(BaseGridQuads[i].Points[0]),
+				GetBasePointCoordinates(BaseGridQuads[i].Points[1]),
 				Color.ToFColor(true),
 				true);
 			DrawDebugLine(GetWorld(), 
-			GetPointCoordinates(FinalQuads[i].Points[1]),
-				GetPointCoordinates(FinalQuads[i].Points[2]),
+			GetBasePointCoordinates(BaseGridQuads[i].Points[1]),
+				GetBasePointCoordinates(BaseGridQuads[i].Points[2]),
 				Color2.ToFColor(true),
 				true);
 			DrawDebugLine(GetWorld(), 
-			GetPointCoordinates(FinalQuads[i].Points[2]),
-				GetPointCoordinates(FinalQuads[i].Points[3]),
+			GetBasePointCoordinates(BaseGridQuads[i].Points[2]),
+				GetBasePointCoordinates(BaseGridQuads[i].Points[3]),
 				Color3.ToFColor(true),
 				true);
 			DrawDebugLine(GetWorld(), 
-			GetPointCoordinates(FinalQuads[i].Points[3]),
-				GetPointCoordinates(FinalQuads[i].Points[0]),
+			GetBasePointCoordinates(BaseGridQuads[i].Points[3]),
+				GetBasePointCoordinates(BaseGridQuads[i].Points[0]),
 				Color4.ToFColor(true),
 				true);
 		}
-		if(!ShowSquares || !PerfectQuads.Num())
+		if(!ShowSquares || !DebugOnlyPerfectQuads.Num())
 			continue;
 		
 		DrawDebugLine(GetWorld(), 
-			PerfectQuads[i][0],
-			PerfectQuads[i][1],
+			DebugOnlyPerfectQuads[i][0],
+			DebugOnlyPerfectQuads[i][1],
 			Color.ToFColor(true),
 			true);
 		DrawDebugLine(GetWorld(), 
-			PerfectQuads[i][1],
-				PerfectQuads[i][2],
+			DebugOnlyPerfectQuads[i][1],
+				DebugOnlyPerfectQuads[i][2],
 				Color2.ToFColor(true),
 				true);
 		DrawDebugLine(GetWorld(), 
-			PerfectQuads[i][2],
-				PerfectQuads[i][3],
+			DebugOnlyPerfectQuads[i][2],
+				DebugOnlyPerfectQuads[i][3],
 				Color3.ToFColor(true),
 				true);
 		DrawDebugLine(GetWorld(), 
-			PerfectQuads[i][3],
-				PerfectQuads[i][0],
+			DebugOnlyPerfectQuads[i][3],
+				DebugOnlyPerfectQuads[i][0],
 				Color4.ToFColor(true),
 				true);
 	}
@@ -852,18 +997,18 @@ void AGridGenerator::DrawSecondGrid()
 {
 	FlushPersistentDebugLines(GetWorld());
 	TArray<FLinearColor> Colors = {FColor::Red, FColor::Green, FColor::Blue, FColor::Yellow, FColor::Purple, FColor::Emerald};
-	for(int i = 0; i < SecondGridShapes.Num(); i++)
+	for(int i = 0; i < BuildingGridShapes.Num(); i++)
 	{
-		if(SecondGridShapes[i].Index == -1 || i != 1)
+		if(BuildingGridShapes[i].Index == -1 || i != 1)
 			continue;
-		if(ShowSecondGrid)
+		if(ShowBuildingGrid)
 		{
 			float LineThickness = 2.f;
-			for(int j = 0; j < SecondGridShapes[i].Points.Num(); j++)
+			for(int j = 0; j < BuildingGridShapes[i].Points.Num(); j++)
 			{
 			DrawDebugLine(GetWorld(), 
-			GetPointCoordinates(SecondGridShapes[i].Points[j]),
-				GetPointCoordinates(SecondGridShapes[i].Points[(j + 1) % SecondGridShapes[i].Points.Num()]),
+			GetBasePointCoordinates(BuildingGridShapes[i].Points[j]),
+				GetBasePointCoordinates(BuildingGridShapes[i].Points[(j + 1) % BuildingGridShapes[i].Points.Num()]),
 				Colors[j].ToFColor(true),
 				true);
 			}
@@ -871,93 +1016,106 @@ void AGridGenerator::DrawSecondGrid()
 	}
 }
 
-void AGridGenerator::GenerateGrid()
+void AGridGenerator::UpdateMarchingBit(const int& ElevationLevel, const int& Index, const bool& Value)
 {
-	GridPoints.Empty();
-	Triangles.Empty();
-	Quads.Empty();
-	FinalQuads.Empty();
-	PerfectQuads.Empty();
-	BuildingPieces.Empty();
-	MarchingBits.Empty();
-	Center = GetActorLocation();
-	GridPoints.Emplace(GridPoints.Num(), Center);
-	for(uint32 i = 0; i < GridSize - 1; i++)
+	Elevations[ElevationLevel].MarchingBits[Index] = Value;
+	for(int i = 0; i < BaseGridPoints[Index].PartOfQuads.Num(); i++)
 	{
-		GenerateHexCoordinates(Center, HexSize * (i + 1), i);
+		UpdateBuildingPiece(ElevationLevel, BaseGridPoints[Index].PartOfQuads[i]);
 	}
-	DivideGridIntoTriangles(Center);
-	DivideGridIntoQuads(Center);
+}
 
-	uint32 It1 = 0;
-	if(Square1Order == 1)
-		RelaxGridBasedOnSquare(SquareSize), It1 = Square1RelaxIterations;
-	else if (Square2Order == 1)
-		RelaxGridBasedOnSquare2(), It1 = Square2RelaxIterations;
-	else if (NeighbourOrder == 1)
-		RelaxGridBasedOnNeighbours(), It1 = NeighbourRelaxIterations;
-	
-	uint32 It2 = 0;
-	if(Square1Order == 2)
-		It2 = Square1RelaxIterations;
-	else if (Square2Order == 2)
-		It2 = Square2RelaxIterations;
-	else if (NeighbourOrder == 2)
-		It2 = NeighbourRelaxIterations;
-
-	uint32 It3 = 0;
-	if(Square1Order == 2)
-		It3 = Square1RelaxIterations;
-	else if (Square2Order == 2)
-		It3 = Square2RelaxIterations;
-	else if (NeighbourOrder == 2)
-		It3 = NeighbourRelaxIterations;
-
-	if(Debug)
+void AGridGenerator::UpdateBuildingPiece(const int& ElevationLevel, const int& Index)
+{
+	UWorld* World = GetWorld();
+	if(!World)
+		return;
+	const FGridQuad& CorrespondingQuad = GetBaseGridQuads()[Index];
+	int MinCorner = -1;
+	TArray<FVector> CageBase;
+	for(int k = 0; k < 4; k++)
+		CageBase.Add(GetBasePointCoordinates(CorrespondingQuad.Points[k]));
+	const auto Find = Elevations[ElevationLevel].BuildingPieces.Find(Index);
+	ABuildingPiece* BuildingPiece;
+	if(!Find)
 	{
-		GetWorld()->GetTimerManager().SetTimer(TimerHandle, Delegate1, Order1TimeRate * (It1 + 1), false, Order1TimeRate * (It1 + 1));
-		GetWorld()->GetTimerManager().SetTimer(TimerHandle2, Delegate2, Order1TimeRate * (It1 + 1) + Order2TimeRate * 0.01f * (It2 + 1), false, Order1TimeRate * (It1 + 1) + Order2TimeRate * 0.01f * (It2 + 1));
-		GetWorld()->GetTimerManager().SetTimer(TimerHandle3, Delegate3, Order1TimeRate * (It1 + 1) + Order2TimeRate * 0.01f * (It2 + 1) + + Order3TimeRate * 0.01f * (It3 + 1), false, Order1TimeRate * (It1 + 1) + Order2TimeRate * 0.01f * (It2 + 1) + + Order3TimeRate * 0.01f * (It3 + 1));
+		BuildingPiece = World->SpawnActor<ABuildingPiece>(BuildingPieceToSpawn, CorrespondingQuad.Center, FRotator(0, 0, 0));
+		Elevations[ElevationLevel].BuildingPieces.Add(Index, BuildingPiece);
 	}
 	else
 	{
-		Relax2();
-		Relax3();
-		CreateWholeGridMesh();
-		CreateSecondGrid();
+		BuildingPiece = *Find;
+		BuildingPiece->Corners.Empty();
 	}
-}
-
-void AGridGenerator::CreateShapeMesh(const int ShapeIndex)
-{
-	UE::Geometry::FPolygon2d MeshPolygon;
-	for(int i = 0; i < SecondGridShapes[ShapeIndex].Points.Num(); i++)
+	int TileConfig = 0;
+	TArray<int> LowerCorners;
+	TArray<int> UpperCorners;
+	TArray<bool> CornersMask;
+	for(int j = 0; j < 8; j++)
 	{
-		MeshPolygon.AppendVertex(UE::Math::TVector2(SecondGridPoints[SecondGridShapes[ShapeIndex].Points[i]].Location));
+		TileConfig += Elevations[ElevationLevel + j / 4].MarchingBits[CorrespondingQuad.Points[j % 4]] * pow(10, 8 - j - 1);
+		CornersMask.Add(Elevations[ElevationLevel + j / 4].MarchingBits[CorrespondingQuad.Points[j % 4]]);
+		if(Elevations[ElevationLevel + j / 4].MarchingBits[CorrespondingQuad.Points[j % 4]])
+		{
+			if(j < 4)
+				LowerCorners.Add(j);
+			else
+				UpperCorners.Add(j);
+			if(MinCorner == -1)
+				MinCorner = j;
+		}
 	}
-	if(MeshPolygon.IsClockwise())
-		MeshPolygon.Reverse();
-	HoveredShapeMesh->GetDynamicMesh()->Reset();
-	float MeshHeight = 10.f;
-	FTransform MeshTransform = FTransform();
-	MeshTransform.SetLocation(FVector(MeshTransform.GetLocation().X, MeshTransform.GetLocation().Y, GetActorLocation().Z - MeshHeight));
-	UGeometryScriptLibrary_MeshPrimitiveFunctions::AppendSimpleExtrudePolygon(HoveredShapeMesh->GetDynamicMesh(),
-	FGeometryScriptPrimitiveOptions(),
-	MeshTransform,
-	MeshPolygon.GetVertices(),
-	MeshHeight,
-	5);
-	HoveredShapeMesh->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
-	UBodySetup* BodySetup = HoveredShapeMesh->GetBodySetup();
-	BodySetup->CollisionTraceFlag = CTF_UseComplexAsSimple;
-	HoveredShapeMesh->EnableComplexAsSimpleCollision();
-	BodySetup->AggGeom.ConvexElems.Empty();
-	BodySetup->CreatePhysicsMeshes(); 
-	HoveredShapeMesh->RecreatePhysicsState();
-	UGeometryScriptLibrary_MeshNormalsFunctions::ComputeSplitNormals(HoveredShapeMesh->GetDynamicMesh(), FGeometryScriptSplitNormalsOptions(), FGeometryScriptCalculateNormalsOptions());
-}
+	float Rotation = 0.f;
+	
+	if(LowerCorners.Num())
+	{
+		if(LowerCorners.Num() >= 2)
+		{
+			for(int j = 0; j < LowerCorners.Num() - 1; j++)
+			{
+				if(LowerCorners[j] != LowerCorners[j + 1] - 1)
+				{
+					for(int p = 0; p < LowerCorners.Num() - j - 1; p++)
+					{
+						const int LastElement = LowerCorners.Last();
+						for(int k = LowerCorners.Num() - 1; k >= 1; k--)
+						{
+							LowerCorners[k] = LowerCorners[k - 1];
+						}
+						LowerCorners[0] = LastElement;
+					}
+					break;
+				}
+			}
+		}
+		if(LowerCorners[0] != 0)
+		{
+			const int RotationAmount = 4 - LowerCorners[0];
+			Rotation = static_cast<float>(RotationAmount) * 90.f;
+			for(int j = 0; j < LowerCorners.Num(); j++)
+			{
+				LowerCorners[j] = (LowerCorners[j] + RotationAmount) % 4;
+			}
+		}
+	}
 
-void AGridGenerator::ResetShapeMesh()
-{
-	HoveredShapeMesh->GetDynamicMesh()->Reset();
+	if(!LowerCorners.Num() && !UpperCorners.Num())
+	{
+		Elevations[ElevationLevel].BuildingPieces.Remove(Index);
+		World->DestroyActor(BuildingPiece);
+		return;
+	}
+	
+	FString RowNameString;
+	BuildingPiece->Corners = LowerCorners;
+	BuildingPiece->Corners.Append(UpperCorners);
+	for(int j = 0; j < LowerCorners.Num(); j++)
+		RowNameString.Append(FString::FromInt(LowerCorners[j]));
+	for(int j = 0; j < UpperCorners.Num(); j++)
+		RowNameString.Append(FString::FromInt(UpperCorners[j]));
+	
+	const FName RowName(RowNameString);
+	const auto Row = BuildingPiece->DataTable->FindRow<FMeshCornersData>(RowName, "MeshCornersRow");
+	BuildingPiece->SetStaticMesh(Row->Mesh);
+	BuildingPiece->DeformMesh(CageBase, 200.f, Rotation);
 }

@@ -40,9 +40,9 @@ FDebugRenderSceneProxy* UGridGeneratorVis::CreateDebugSceneProxy()
 	if(World)
 	{
 		TArray<FLinearColor> Colors = {FColor::Red, FColor::Green, FColor::Blue, FColor::Yellow, FColor::Purple, FColor::Emerald, FColor::Magenta};
-		if(Owner->ShowGrid)
+		if(Owner->ShowBaseGrid)
 		{
-			const TArray<FGridQuad>& FinalQuads = Owner->GetFinalQuads();
+			const TArray<FGridQuad>& FinalQuads = Owner->GetBaseGridQuads();
 			for(int i = 0; i < FinalQuads.Num(); i++)
 			{
 				if(FinalQuads[i].Index == -1)
@@ -53,16 +53,16 @@ FDebugRenderSceneProxy* UGridGeneratorVis::CreateDebugSceneProxy()
 				//	continue;
 				for(int j = 0; j < 4; j++)
 				{
-					DSceneProxy->Lines.Emplace(Owner->GetPointCoordinates(FinalQuads[i].Points[j]),
-						Owner->GetPointCoordinates(FinalQuads[i].Points[(j + 1) % FinalQuads[i].Points.Num()]),
+					DSceneProxy->Lines.Emplace(Owner->GetBasePointCoordinates(FinalQuads[i].Points[j]),
+						Owner->GetBasePointCoordinates(FinalQuads[i].Points[(j + 1) % FinalQuads[i].Points.Num()]),
 						Colors[1].ToFColor(true),
 						1.5f);
 				}
 			}
 		}
-		if(Owner->ShowSecondGrid)
+		if(Owner->ShowBuildingGrid)
 		{
-			const TArray<FGridShape>& SecondGrid = Owner->GetSecondGrid();
+			const TArray<FGridShape>& SecondGrid = Owner->GetBuildingGridShapes();
 			for(int i = 0; i < SecondGrid.Num(); i++)
 			{
 				if(SecondGrid[i].Index == -1)
@@ -70,17 +70,17 @@ FDebugRenderSceneProxy* UGridGeneratorVis::CreateDebugSceneProxy()
 				for(int j = 0; j < SecondGrid[i].Points.Num(); j++)
 				{
 					DSceneProxy->Lines.Emplace( 
-					Owner->GetSecondPointCoordinates(SecondGrid[i].Points[j]),
-						Owner->GetSecondPointCoordinates(SecondGrid[i].Points[(j + 1) % SecondGrid[i].Points.Num()]),
+					Owner->GetBuildingPointCoordinates(SecondGrid[i].Points[j]),
+						Owner->GetBuildingPointCoordinates(SecondGrid[i].Points[(j + 1) % SecondGrid[i].Points.Num()]),
 						Colors[0].ToFColor(true),
 						1.5f);
 				}
 			}
 		}
 
-		if(Owner->ShowGrid1Points)
+		if(Owner->ShowBaseGridPoints)
 		{
-			const TArray<FGridPoint>& Grid1Points = Owner->GetGridPoints();
+			const TArray<FGridPoint>& Grid1Points = Owner->GetBaseGridPoints();
 			for(int i = 0; i < Grid1Points.Num(); i++)
 			{
 				if(Grid1Points[i].Index == -1)
@@ -92,9 +92,9 @@ FDebugRenderSceneProxy* UGridGeneratorVis::CreateDebugSceneProxy()
 			}
 		}
 
-		if(Owner->ShowGrid2Points)
+		if(Owner->ShowBuildingGridPoints)
 		{
-			const TArray<FGridPoint>& Grid2Points = Owner->GetSecondGridPoints();
+			const TArray<FGridPoint>& Grid2Points = Owner->GetBuildingGridPoints();
 			for(int i = 0; i < Grid2Points.Num(); i++)
 			{
 				if(Grid2Points[i].Index == -1)
@@ -103,9 +103,9 @@ FDebugRenderSceneProxy* UGridGeneratorVis::CreateDebugSceneProxy()
 			}
 		}
 
-		if(Owner->ShowGrid1QuadIndices)
+		if(Owner->ShowBaseGridQuadIndices)
 		{
-			const TArray<FGridQuad>& FinalQuads = Owner->GetFinalQuads();
+			const TArray<FGridQuad>& FinalQuads = Owner->GetBaseGridQuads();
 			for(int i = 0; i < FinalQuads.Num(); i++)
 			{
 				if(FinalQuads[i].Index == -1)
@@ -115,9 +115,9 @@ FDebugRenderSceneProxy* UGridGeneratorVis::CreateDebugSceneProxy()
 			}
 		}
 
-		if(Owner->ShowGrid2QuadIndices)
+		if(Owner->ShowBuildingGridQuadIndices)
 		{
-			const TArray<FGridShape>& SecondGrid = Owner->GetSecondGrid();
+			const TArray<FGridShape>& SecondGrid = Owner->GetBuildingGridShapes();
 			for(int i = 0; i < SecondGrid.Num(); i++)
 			{
 				if(SecondGrid[i].Index == -1)

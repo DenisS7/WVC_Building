@@ -23,14 +23,14 @@ APlayerCamera::APlayerCamera()
 	SpringArm->TargetArmLength = 2000.f;
 	SpringArm->SetRelativeRotation(FRotator(-60.f, 0.f, 0.f));
 
-	SquareHoverDelegate = FTimerDelegate::CreateUObject(this, &APlayerCamera::HoverOverShape);
+	MouseHoverDelegate = FTimerDelegate::CreateUObject(this, &APlayerCamera::HoverOverShape);
 }
 
 // Called when the game starts or when spawned
 void APlayerCamera::BeginPlay()
 {
 	Super::BeginPlay();
-	GetWorld()->GetTimerManager().SetTimer(SquareHoverTimerHandle, SquareHoverDelegate, 0.01f, true, 0.f);
+	GetWorld()->GetTimerManager().SetTimer(MouseHoverTimerHandle, MouseHoverDelegate, 0.01f, true, 0.f);
 }
 
 // Called every frame
@@ -63,18 +63,14 @@ void APlayerCamera::OnLeftMouseButtonPressed()
 	AGridGenerator* Grid = nullptr;
 	int Shape = -1;
 	UtilityLibrary::GetGridAndShapeMouseIsHoveringOver(GetWorld(), Grid, Shape);
+
 	if(!Grid || Shape < 0)
 	{
 		return;
 	}
 
-	const FGridShape& GridShape = Grid->GetSecondGrid()[Shape];
-	const TArray<int>& ShapePoints = GridShape.Points;
-	Grid->MarchingBits[0][GridShape.CorrespondingGrid1Point] = true;
-	for(int i = 0; i < ShapePoints.Num(); i++)
-	{
-		UtilityLibrary::UpdateBuildingPiece(GetWorld(), Grid, ShapePoints[i], BuildingPieceToSpawn);
-	}
+	const FGridShape& GridShape = Grid->GetBuildingGridShapes()[Shape];
+	Grid->UpdateMarchingBit(0, GridShape.CorrespondingBaseGridPoint, true);//MarchingBits[0][GridShape.CorrespondingGrid1Point] = true;
 	
 	//WVC Step to determine the pool
 }
@@ -90,17 +86,14 @@ void APlayerCamera::OnRightMouseButtonPressed()
 	AGridGenerator* Grid = nullptr;
 	int Shape = -1;
 	UtilityLibrary::GetGridAndShapeMouseIsHoveringOver(GetWorld(), Grid, Shape);
+
 	if(!Grid || Shape < 0)
 	{
 		return;
 	}
-	const FGridShape& GridShape = Grid->GetSecondGrid()[Shape];
-	const TArray<int>& ShapePoints = GridShape.Points;
-	Grid->MarchingBits[0][GridShape.CorrespondingGrid1Point] = false;
-	for(int i = 0; i < ShapePoints.Num(); i++)
-	{
-		UtilityLibrary::UpdateBuildingPiece(GetWorld(), Grid, ShapePoints[i], BuildingPieceToSpawn);
-	}
+	
+	const FGridShape& GridShape = Grid->GetBuildingGridShapes()[Shape];
+	Grid->UpdateMarchingBit(0, GridShape.CorrespondingBaseGridPoint, false);
 }
 
 void APlayerCamera::OnRightMouseButtonReleased()

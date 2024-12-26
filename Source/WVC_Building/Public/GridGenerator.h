@@ -17,10 +17,17 @@ struct FGridPoint
 	GENERATED_BODY()
 	UPROPERTY(BlueprintReadOnly)
 	int Index = -1;
+	
 	UPROPERTY(BlueprintReadOnly)
 	FVector Location = FVector::ZeroVector;
+
+	UPROPERTY(BlueprintReadOnly)
 	TArray<int> Neighbours;
+
+	UPROPERTY(BlueprintReadOnly)
 	TArray<int> PartOfQuads;
+
+	UPROPERTY(BlueprintReadOnly)
 	bool IsEdge = false;
 	
 	FGridPoint() {}
@@ -39,10 +46,13 @@ struct FGridQuad
 	
 	UPROPERTY(BlueprintReadOnly)
 	int Index = -1;
+	
 	UPROPERTY(BlueprintReadOnly)
 	FVector Center;
+	
 	UPROPERTY(BlueprintReadOnly)
 	TArray<int> Points;
+	
 	UPROPERTY(BlueprintReadOnly)
 	TArray<int> Neighbours;
 	
@@ -93,22 +103,29 @@ USTRUCT(BlueprintType)
 struct FGridShape
 {
 	GENERATED_BODY()
+	
 	UPROPERTY(BlueprintReadOnly)
 	int Index = -1;
+	
 	UPROPERTY(BlueprintReadOnly)
 	TArray<int> Points;
+	
 	UPROPERTY(BlueprintReadOnly)
 	TArray<int> Neighbours;
+	
 	UPROPERTY(BlueprintReadOnly)
-	int CorrespondingGrid1Point = 0;
+	int CorrespondingBaseGridPoint = 0;
+	
 	UPROPERTY(BlueprintReadOnly)
 	FVector Center = FVector::ZeroVector;
-	
+
+	UPROPERTY(BlueprintReadOnly)
 	EShape Shape = EShape::None;
 
 	FGridShape() {}
+	
 	FGridShape(const int InIndex, const TArray<int>& InPoints, const int InCorrespondingGrid1Point)
-		: Index(InIndex), Points(InPoints), CorrespondingGrid1Point(InCorrespondingGrid1Point)
+		: Index(InIndex), Points(InPoints), CorrespondingBaseGridPoint(InCorrespondingGrid1Point)
 	{
 		Shape = static_cast<EShape>(InPoints.Num());
 	}
@@ -136,140 +153,209 @@ struct FVoxelConfig
 	}
 };
 
+USTRUCT(BlueprintType)
+struct FElevationData
+{
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadOnly)
+	TArray<bool> MarchingBits;
+
+	UPROPERTY(BlueprintReadOnly)
+	TMap<int, ABuildingPiece*> BuildingPieces;
+
+	FElevationData() {}
+
+	FElevationData(const int& NumBits)
+	{
+		MarchingBits.Init(false, NumBits);
+	}
+};
+
 UCLASS()
 class WVC_BUILDING_API AGridGenerator : public AActor
 {
 	GENERATED_BODY()
 	
 public:	
-	// Sets default values for this actor's properties
-	AGridGenerator();
-protected:
-	// Called when the game starts or when spawned
-	virtual void BeginPlay() override;
-	UDebugStrings* DebugStringsComp;
-	UGridGeneratorVis* GridGeneratorVis;
-	UPROPERTY(BlueprintReadOnly)
-	TArray<FGridPoint> GridPoints;
-	TArray<FGridTriangle> Triangles;
-	TArray<FGridQuad> Quads;
-	UPROPERTY(BlueprintReadOnly)
-	TArray<FGridQuad> FinalQuads;
-	TArray<TArray<FVector>> PerfectQuads;
-	
-	UPROPERTY(BlueprintReadOnly)
-	TArray<FGridPoint> SecondGridPoints;
-	UPROPERTY(BlueprintReadOnly)
-	TArray<FGridShape> SecondGridShapes;
-
-	UPROPERTY(BlueprintReadOnly, EditAnywhere)
-	UDynamicMeshComponent* WholeGridMesh;
-	UPROPERTY(BlueprintReadOnly, EditAnywhere)
-	UDynamicMeshComponent* HoveredShapeMesh;
-	
-	FVector Center;
-	void GenerateHexCoordinates(const FVector& GridCenter, const float Size, const uint32 Index2);
-	void DivideGridIntoTriangles(const FVector& GridCenter);
-	void DivideGridIntoQuads(const FVector& GridCenter);
-	void FindPointNeighboursInQuad(const int QuadIndex);
-	void SortQuadPoints(FGridQuad& Quad);
-	void SortShapePoints(FGridShape& Shape, bool SecondGrid = true);
-	void RelaxGridBasedOnSquare(float SquareSideLength)	;
-	void RelaxGridBasedOnSquare2();
-	void RelaxGridBasedOnNeighbours();
-	void Relax2();
-	void Relax3();
-	int GetOrAddMidpointIndexInGrid1(TMap<TPair<int, int>, int>& Midpoints, int Point1, int Point2);
-	void CreateSecondGrid();
-	void CreateWholeGridMesh();
-	bool IsPointInShape(const FVector& Point, const FGridShape& Quad) const;
-	uint32 IterationsUsed1 = 0;
-	uint32 IterationsUsed2 = 0;
-	
-	FTimerHandle SquareHandle1;
-	FTimerHandle SquareHandle2;
-	FTimerHandle TimerHandle;
-	FTimerHandle TimerHandle2;
-	FTimerHandle TimerHandle3;
-	FTimerDelegate SquareDelegate1;
-	FTimerDelegate SquareDelegate2;
-	FTimerDelegate Delegate1;
-	FTimerDelegate Delegate2;
-	FTimerDelegate Delegate3;
-
-public:
-	TArray<TArray<bool>> MarchingBits;
-	TMap<TPair<int, int>, ABuildingPiece*> BuildingPieces;
-	
 	UPROPERTY(EditAnywhere, Category = "Show Debug")
 	bool Debug = false;
+	
 	UPROPERTY(EditAnywhere, Category = "Show Debug")
-	bool ShowGrid = true;
+	bool ShowBaseGrid = true;
+	
 	UPROPERTY(EditAnywhere, Category = "Show Debug")
 	bool ShowSquares = false;
+	
 	UPROPERTY(EditAnywhere, Category = "Show Debug")
-	bool ShowSecondGrid = false;
+	bool ShowBuildingGrid = false;
+	
 	UPROPERTY(EditAnywhere, Category = "Show Debug")
-	bool ShowGrid1Points = false;
+	bool ShowBaseGridPoints = false;
+	
 	UPROPERTY(EditAnywhere, Category = "Show Debug")
-	bool ShowGrid2Points = false;
+	bool ShowBuildingGridPoints = false;
+	
 	UPROPERTY(EditAnywhere, Category = "Show Debug")
-	bool ShowGrid1QuadIndices = false;
+	bool ShowBaseGridQuadIndices = false;
+	
 	UPROPERTY(EditAnywhere, Category = "Show Debug")
-	bool ShowGrid2QuadIndices = false;
+	bool ShowBuildingGridQuadIndices = false;
 	
 	UPROPERTY(EditAnywhere)
-	float HexSize = 50.f;
+	float FirstHexSize = 50.f;
+	
 	UPROPERTY(EditAnywhere)
-	uint32 GridSize = 5;
+	uint32 GridExtent = 5;
+	
 	UPROPERTY(EditAnywhere)
-	float SquareSize = 15.f;
+	float PerfectEqualSquareSize = 15.f;
+	
 	UPROPERTY(EditAnywhere)
 	float ForceScale = 0.1f;
+
 	UPROPERTY(EditAnywhere)
-	uint32 Square1RelaxIterations = 10;
+	uint32 PerfectEqualSquareRelaxIterations = 10;
+
 	UPROPERTY(EditAnywhere)
-	uint32 Square2RelaxIterations = 10;
+	uint32 PerfectLocalSquareRelaxIterations = 10;
+
 	UPROPERTY(EditAnywhere)
 	uint32 NeighbourRelaxIterations = 10;
+
 	UPROPERTY(EditAnywhere)
 	uint32 Seed = 0;
 
+	
 	UPROPERTY(EditAnywhere)
-	uint32 Square1Order = 1;
+	uint32 PerfectEqualSquareOrder = 1;
+
 	UPROPERTY(EditAnywhere)
-	uint32 Square2Order = 2;
+	uint32 PerfectLocalSquareOrder = 2;
+	
 	UPROPERTY(EditAnywhere)
 	uint32 NeighbourOrder = 3;
 
+	
 	UPROPERTY(EditAnywhere)
 	float Order1TimeRate = 0.1f;
+
 	UPROPERTY(EditAnywhere)
 	float Order2TimeRate = 0.1f;
+
 	UPROPERTY(EditAnywhere)
 	float Order3TimeRate = 0.1f;
+	
+	// Sets default values for this actor's properties
+	AGridGenerator();
+	
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;
+	
 	//virtual void override;
 	virtual void OnConstruction(const FTransform& Transform) override;
+	
+	virtual bool ShouldTickIfViewportsOnly() const override { return true; }
+	
 	void DrawGrid();
 	void DrawSecondGrid();
 	void GenerateGrid();
 	void CreateShapeMesh(const int ShapeIndex);
 	void ResetShapeMesh();
-	
+
+	void UpdateMarchingBit(const int& ElevationLevel, const int& Index, const bool& Value);
+	void UpdateBuildingPiece(const int& ElevationLevel, const int& Index);
 	int DetermineWhichGridShapeAPointIsIn(const FVector& Point);
+	
 	static int GetFirstTriangleIndexOnHex(const uint32 Hex) { return 6 * Hex * Hex; }
 	static int GetNumberOfPointsOnHex(const uint32 Hex) { if(Hex == 0) return 1; return 6 * Hex; }
 	static int GetFirstPointIndexOnHex(const uint32 Hex) { if(Hex == 0) return 0; return Hex * (Hex - 1) / 2 * 6 + 1;}
 ;	static int GetIndexOfPointOnHex(const uint32 Hex, const uint32 Point) { if (Hex == 0) return 0; return GetFirstPointIndexOnHex(Hex) + Point; }
-	const FVector& GetPointCoordinates(const uint32 Point) const { return GridPoints[Point].Location; }
-	const FVector& GetSecondPointCoordinates(const uint32 Point) const { return SecondGridPoints[Point].Location; }
-	virtual bool ShouldTickIfViewportsOnly() const override { return true; }
-	const TArray<FGridTriangle>& GetTriangles() const { return Triangles; }
-	const TArray<FGridQuad>& GetQuads() const { return Quads; }
-	const TArray<FGridPoint>& GetGridPoints() const { return GridPoints; }
-	const TArray<FGridPoint>& GetSecondGridPoints() const { return SecondGridPoints; }
-	const TArray<FGridQuad>& GetFinalQuads() const { return FinalQuads; }
-	const TArray<FGridShape>& GetSecondGrid() const { return SecondGridShapes; }
+	const FVector& GetBasePointCoordinates(const uint32 Point) const { return BaseGridPoints[Point].Location; }
+	const FVector& GetBuildingPointCoordinates(const uint32 Point) const { return BuildingGridPoints[Point].Location; }
+	const TArray<FGridPoint>& GetBaseGridPoints() const { return BaseGridPoints; }
+	const TArray<FGridPoint>& GetBuildingGridPoints() const { return BuildingGridPoints; }
+	const TArray<FGridQuad>& GetBaseGridQuads() const { return BaseGridQuads; }
+	const TArray<FGridShape>& GetBuildingGridShapes() const { return BuildingGridShapes; }
+	const FElevationData& GetElevationData(const int& Level) const { return Elevations[Level]; }
+	
+protected:
+	// Called when the game starts or when spawned
+	virtual void BeginPlay() override;
+	
+	void FindPointNeighboursInQuad(const int QuadIndex);
+	void SortQuadPoints(FGridQuad& Quad);
+	void SortShapePoints(FGridShape& Shape, bool SecondGrid = true);
+	int GetOrAddMidpointIndexInBaseGrid(TMap<TPair<int, int>, int>& Midpoints, int Point1, int Point2);
+	bool IsPointInShape(const FVector& Point, const FGridShape& Quad) const;
+	
+	void RelaxGridBasedOnPerfectEqualSquare(float SquareSideLength);
+	void RelaxGridBasedOnPerfectLocalSquare();
+	void RelaxGridBasedOnNeighbours();
+	
+	void Relax1();
+	void Relax2();
+	void Relax3();
+	void CreateWholeGridMesh();
+	void CreateSecondGrid();
+
+	void GenerateHexCoordinates(const FVector& GridCenter, const float HexSize, const uint32 HexIndex);
+	TArray<FGridTriangle> DivideGridIntoTriangles(const FVector& GridCenter);
+	void DivideGridIntoQuads(const FVector& GridCenter, TArray<FGridTriangle>& Triangles);
+	void RelaxAndCreateSecondGrid();
+
+	UPROPERTY(BlueprintReadOnly)
+	FVector BaseGridCenter = FVector::ZeroVector;
+	
+	UPROPERTY(BlueprintReadOnly)
+	TArray<FGridPoint> BaseGridPoints;
+	
+	UPROPERTY(BlueprintReadOnly)
+	TArray<FGridQuad> BaseGridQuads;
+	
+	TArray<TArray<FVector>> DebugOnlyPerfectQuads;
+	
+	UPROPERTY(BlueprintReadOnly)
+	TArray<FGridPoint> BuildingGridPoints;
+	
+	UPROPERTY(BlueprintReadOnly)
+	TArray<FGridShape> BuildingGridShapes;
+
+	UPROPERTY(BlueprintReadOnly, EditAnywhere)
+	UDebugStrings* DebugStringsComp = nullptr;
+	
+	UPROPERTY(BlueprintReadOnly, EditAnywhere)
+	UGridGeneratorVis* GridGeneratorVis = nullptr;
+	
+	UPROPERTY(BlueprintReadOnly, EditAnywhere)
+	UDynamicMeshComponent* WholeGridMesh = nullptr;
+	
+	UPROPERTY(BlueprintReadOnly, EditAnywhere)
+	UDynamicMeshComponent* HoveredShapeMesh = nullptr;
+	
+	uint32 IterationsUsed1 = 0;
+	uint32 IterationsUsed2 = 0;
+
+	FTimerHandle PerfectEqualSquareTimerHandle;
+	FTimerHandle PerfectLocalSquareTimerHandle;
+	FTimerHandle SecondRelaxTimerHandle;
+	FTimerHandle ThirdRelaxTimerHandle;
+	FTimerHandle CreateWholeGridMeshTimerHandle;
+	FTimerHandle CreateSecondGridTimerHandle;
+
+	FTimerDelegate PerfectEqualSquareDelegate;
+	FTimerDelegate PerfectLocalSquareDelegate;
+	FTimerDelegate SecondRelaxDelegate;
+	FTimerDelegate ThirdRelaxDelegate;
+	FTimerDelegate CreateWholeGridMeshDelegate;
+	FTimerDelegate CreateSecondGridDelegate;
+
+	UPROPERTY(BlueprintReadOnly)
+	TArray<FElevationData> Elevations;
+	
+	UPROPERTY(BlueprintReadOnly, EditDefaultsOnly)
+	TSubclassOf<ABuildingPiece> BuildingPieceToSpawn;
+
+public:
+	
 };
