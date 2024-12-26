@@ -24,17 +24,6 @@ APlayerCamera::APlayerCamera()
 	SpringArm->SetRelativeRotation(FRotator(-60.f, 0.f, 0.f));
 
 	SquareHoverDelegate = FTimerDelegate::CreateUObject(this, &APlayerCamera::HoverOverShape);
-	//DataTable = LoadObject<UDataTable>(nullptr, TEXT("/Game/DATA/Blueprints/DT_MeshCorners.DT_MeshCorners"));
-	//FSoftObjectPath TablePath = FSoftObjectPath(TEXT("Game/DATA/Blueprints/DT_MeshCorners.DT_MeshCorners"));
-	//FString TablePath = "Game/Blueprints/DT_MeshCorners";
-	//TArray<UObject*> DataTables;
-	//EngineUtils::FindOrLoadAssetsByPath(TablePath, DataTables, EngineUtils::ATL_Regular);
-	//DataTable = Cast<UDataTable>(TablePath.TryLoad());
-	//if(!DataTable)
-	//{
-	//	bool ok = true;
-	//}
-	//GroundTiles.Add(1000000, )
 }
 
 // Called when the game starts or when spawned

@@ -42,7 +42,5 @@ public:
 	virtual void Tick(float DeltaTime) override;
 
 	void SetStaticMesh(UStaticMesh* StaticMesh) { StaticMeshComponent->SetStaticMesh(StaticMesh); }
-	//void RotateStaticMesh(FRotator Rotator) { Static};
 	void DeformMesh(const TArray<FVector>& CageBase, const float CageHeight, const float Rotation);
-	
 };

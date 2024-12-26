@@ -46,38 +46,30 @@ void AGridGenerator::BeginPlay()
 	//VoxelConfig.Add(FirstElevation);
 }
 
-void AGridGenerator::GenerateHexCoordinates(const FVector& GridCenter, const float Size, const uint32 Index)
+void AGridGenerator::GenerateHexCoordinates(const FVector& GridCenter, const float Size, const uint32 Index2)
 {
-	const uint32 NextIndex = Index + 1;
+	const uint32 NextIndex = Index2 + 1;
 	const uint32 NumPoints = 6 * NextIndex;
-	//if(Index > 0)
-		//NumPoints -= 1;
-	//TArray<FVector> HexPoints;
-	//HexPoints.SetNum(NumPoints);
 	const int PrevNumPoints = GridPoints.Num();
 	GridPoints.SetNum(PrevNumPoints + NumPoints);
-	bool IsEdgePoint = (Index == GridSize - 2);
+	bool IsEdgePoint = (Index2 == GridSize - 2);
 	for(uint32 i = 0; i < 6; i++)
 	{
 		const float AngleRad = FMath::DegreesToRadians(60.f * i - 150.f);
-		//HexPoints[i * NextIndex] = FVector(GridCenter.X + Size * FMath::Cos(AngleRad), GridCenter.Y + Size * FMath::Sin(AngleRad), GridCenter.Z);
 		GridPoints[PrevNumPoints+ i * NextIndex] = FGridPoint(PrevNumPoints+ i * NextIndex, FVector(GridCenter.X + Size * FMath::Cos(AngleRad), GridCenter.Y + Size * FMath::Sin(AngleRad), GridCenter.Z), IsEdgePoint);
 	}
 	const float FractionDistanceBetween = 1.f / static_cast<float>(NextIndex);
 	for(uint32 i = 0; i < 6; i++)
 	{
-		for(uint32 j = 0; j < Index; j++)
+		for(uint32 j = 0; j < Index2; j++)
 		{
 			const int PointIndex = i * NextIndex + j + 1;
 			const float FractionDist = static_cast<float>(j + 1) * FractionDistanceBetween;
-			//HexPoints[PointIndex] = FractionDist * HexPoints[(((i + 1) % 6) * NextIndex)] +
-			//									(1.f - FractionDist) * HexPoints[i * NextIndex];
 			GridPoints[PrevNumPoints + PointIndex] = FGridPoint(PrevNumPoints + PointIndex,
 				FractionDist * GridPoints[PrevNumPoints + (((i + 1) % 6) * NextIndex)].Location +
 									(1.f - FractionDist) * GridPoints[PrevNumPoints + i * NextIndex].Location, IsEdgePoint);
 		}
 	}
-	//GridCoordinates.Emplace(HexPoints);
 }
 
 void AGridGenerator::DivideGridIntoTriangles(const FVector& GridCenter)
@@ -88,8 +80,8 @@ void AGridGenerator::DivideGridIntoTriangles(const FVector& GridCenter)
 	int TriangleIndex = 0;
 	for(uint32 i = 0; i < GridSize - 1; i++)
 	{
-		const int SmallMaxCoordinate = GetNumberOfPointsOnHex(i);//GridCoordinates[i].Num();
-		const int LargeMaxCoordinate = GetNumberOfPointsOnHex(i + 1);//GridCoordinates[i + 1].Num();
+		const int SmallMaxCoordinate = GetNumberOfPointsOnHex(i);
+		const int LargeMaxCoordinate = GetNumberOfPointsOnHex(i + 1);
 		const int TrianglesPerSide = i * 2 + 1;
 		for(int j = 0; j < 6; j++)
 		{
@@ -102,10 +94,6 @@ void AGridGenerator::DivideGridIntoTriangles(const FVector& GridCenter)
 				TArray<int>TrianglePointsIndices;
 				if(LargeTriangle)
 				{
-					//TrianglePoints.Emplace(i, SmallCoordinate);
-					//TrianglePoints.Emplace(i + 1, LargeCoordinate);
-					//TrianglePoints.Emplace(i + 1, (LargeCoordinate + 1) % LargeMaxCoordinate);
-
 					TrianglePointsIndices.Add(GetIndexOfPointOnHex(i, SmallCoordinate));
 					TrianglePointsIndices.Add(GetIndexOfPointOnHex(i + 1, LargeCoordinate));
 					TrianglePointsIndices.Add(GetIndexOfPointOnHex(i + 1, (LargeCoordinate + 1) % LargeMaxCoordinate));
@@ -114,10 +102,6 @@ void AGridGenerator::DivideGridIntoTriangles(const FVector& GridCenter)
 				}
 				else
 				{
-					//TrianglePoints.Emplace(i, SmallCoordinate);
-					//TrianglePoints.Emplace(i, (SmallCoordinate + 1) % SmallMaxCoordinate);
-					//TrianglePoints.Emplace(i + 1, LargeCoordinate);
-
 					TrianglePointsIndices.Add(GetIndexOfPointOnHex(i, SmallCoordinate));
 					TrianglePointsIndices.Add(GetIndexOfPointOnHex(i, (SmallCoordinate + 1) % SmallMaxCoordinate));
 					TrianglePointsIndices.Add(GetIndexOfPointOnHex(i + 1, LargeCoordinate));
@@ -366,7 +350,6 @@ void AGridGenerator::SortShapePoints(FGridShape& Shape, const bool SecondGrid)
 
 void AGridGenerator::RelaxGridBasedOnSquare(const float SquareSideLength)
 {
-	//for(uint32 Iterations = 0; Iterations < SquareRelaxIterations; Iterations++)
 	if(Debug)
 	{
 		IterationsUsed1 = 0;
@@ -688,11 +671,6 @@ void AGridGenerator::CreateSecondGrid()
 			}
 		}
 	}
-
-	//TArray<FVoxelConfig> FirstElevation;
-
-	//if(ShowSecondGrid)
-		//DrawSecondGrid();
 }
 
 void AGridGenerator::CreateWholeGridMesh()
@@ -718,8 +696,8 @@ void AGridGenerator::CreateWholeGridMesh()
 	UGeometryScriptLibrary_MeshPrimitiveFunctions::AppendSimpleExtrudePolygon(WholeGridMesh->GetDynamicMesh(),
 	FGeometryScriptPrimitiveOptions(),
 	MeshTransform,
-	MeshPolygon.GetVertices(), //Vertices2D,
-	MeshHeight, // Height
+	MeshPolygon.GetVertices(),
+	MeshHeight,
 	5);
 	WholeGridMesh->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
 	UBodySetup* BodySetup = WholeGridMesh->GetBodySetup();
@@ -752,19 +730,14 @@ bool AGridGenerator::IsPointInShape(const FVector& Point, const FGridShape& Shap
 int AGridGenerator::DetermineWhichGridShapeAPointIsIn(const FVector& Point)
 {
 	TArray<bool> Visited;
-	//FVector<float> DistanceToQuad;
-	//FVector<bool> IsDistanceCalculated;
 	Visited.SetNumZeroed(SecondGridShapes.Num());
-	//DistanceToQuad.SetNum(FinalQuads.Num());
 	int CurrentShape = 0;
 	int VisitedQuadNumber = 0;
-	//DrawDebugSphere(GetWorld(), Point, 6.f, 8, FColor::Purple, false, 10.f);
 
 	while(VisitedQuadNumber < SecondGridShapes.Num())
 	{
 		if(IsPointInShape(Point, SecondGridShapes[CurrentShape]))
 		{
-			//UE_LOG(LogTemp, Warning, TEXT("Shape: %d"), CurrentShape);
 			return CurrentShape;
 		}
 		
@@ -779,14 +752,13 @@ int AGridGenerator::DetermineWhichGridShapeAPointIsIn(const FVector& Point)
 			const int NeighbourIndex = SecondGridShapes[CurrentShape].Neighbours[i];
 			if(Visited[NeighbourIndex])
 				continue;
-			float DistanceBetween = FVector::DistSquared2D(Point, SecondGridShapes[NeighbourIndex].Center);
+			const float DistanceBetween = FVector::DistSquared2D(Point, SecondGridShapes[NeighbourIndex].Center);
 			if(DistanceBetween < ClosestNeighbourDistance)
 			{
 				ClosestNeighbourDistance = DistanceBetween;
 				ClosestNeighbour = NeighbourIndex;
 			}
 		}
-		//DrawDebugSphere(GetWorld(), SecondGridShapes[CurrentShape].Center, 5.f, 8, FColor::Yellow, false, 10.f);
 		if(ClosestNeighbour == -1)
 		{
 			return -1;
@@ -829,8 +801,6 @@ void AGridGenerator::DrawGrid()
 		if(ShowGrid)
 		{
 			float LineThickness = 2.f;
-			//if(i != 24)
-			//	continue;
 			DrawDebugLine(GetWorld(), 
 			GetPointCoordinates(FinalQuads[i].Points[0]),
 				GetPointCoordinates(FinalQuads[i].Points[1]),
@@ -854,7 +824,7 @@ void AGridGenerator::DrawGrid()
 		}
 		if(!ShowSquares || !PerfectQuads.Num())
 			continue;
-		//DrawDebugString(GetWorld(), TriangleCenter, *FString::Printf(TEXT("T")), nullptr, FColor::Red, 100.f, true, 5.f);
+		
 		DrawDebugLine(GetWorld(), 
 			PerfectQuads[i][0],
 			PerfectQuads[i][1],
@@ -910,8 +880,6 @@ void AGridGenerator::GenerateGrid()
 	PerfectQuads.Empty();
 	BuildingPieces.Empty();
 	MarchingBits.Empty();
-	//FirstElevation.Empty();
-	//VoxelConfig.Empty();
 	Center = GetActorLocation();
 	GridPoints.Emplace(GridPoints.Num(), Center);
 	for(uint32 i = 0; i < GridSize - 1; i++)

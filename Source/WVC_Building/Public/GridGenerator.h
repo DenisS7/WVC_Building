@@ -157,8 +157,6 @@ protected:
 	TArray<FGridQuad> FinalQuads;
 	TArray<TArray<FVector>> PerfectQuads;
 	
-	
-	
 	UPROPERTY(BlueprintReadOnly)
 	TArray<FGridPoint> SecondGridPoints;
 	UPROPERTY(BlueprintReadOnly)
@@ -170,7 +168,7 @@ protected:
 	UDynamicMeshComponent* HoveredShapeMesh;
 	
 	FVector Center;
-	void GenerateHexCoordinates(const FVector& GridCenter, const float Size, const uint32 Index);
+	void GenerateHexCoordinates(const FVector& GridCenter, const float Size, const uint32 Index2);
 	void DivideGridIntoTriangles(const FVector& GridCenter);
 	void DivideGridIntoQuads(const FVector& GridCenter);
 	void FindPointNeighboursInQuad(const int QuadIndex);
@@ -200,10 +198,6 @@ protected:
 	FTimerDelegate Delegate3;
 
 public:
-	//UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	//TArray<FVoxelConfig> FirstElevation;
-	
-	//TArray<TArray<FVoxelConfig>> VoxelConfig;
 	TArray<TArray<bool>> MarchingBits;
 	TMap<TPair<int, int>, ABuildingPiece*> BuildingPieces;
 	
@@ -228,8 +222,6 @@ public:
 	float HexSize = 50.f;
 	UPROPERTY(EditAnywhere)
 	uint32 GridSize = 5;
-	//UPROPERTY(EditAnywhere)
-	//bool DoSquareRelaxationFirst = true;
 	UPROPERTY(EditAnywhere)
 	float SquareSize = 15.f;
 	UPROPERTY(EditAnywhere)
@@ -274,12 +266,10 @@ public:
 	const FVector& GetPointCoordinates(const uint32 Point) const { return GridPoints[Point].Location; }
 	const FVector& GetSecondPointCoordinates(const uint32 Point) const { return SecondGridPoints[Point].Location; }
 	virtual bool ShouldTickIfViewportsOnly() const override { return true; }
-	//FVector GetGridCoordinate(const int Hex, const int Coordinate) {return GridCoordinates[Hex][Coordinate];}
 	const TArray<FGridTriangle>& GetTriangles() const { return Triangles; }
 	const TArray<FGridQuad>& GetQuads() const { return Quads; }
 	const TArray<FGridPoint>& GetGridPoints() const { return GridPoints; }
 	const TArray<FGridPoint>& GetSecondGridPoints() const { return SecondGridPoints; }
 	const TArray<FGridQuad>& GetFinalQuads() const { return FinalQuads; }
 	const TArray<FGridShape>& GetSecondGrid() const { return SecondGridShapes; }
-	//const TArray<FGridQuad>& GetFinalSquares() const { return Square}
 };

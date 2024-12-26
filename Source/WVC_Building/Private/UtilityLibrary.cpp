@@ -14,7 +14,7 @@ void UtilityLibrary::GetGridAndShapeMouseIsHoveringOver(const UWorld* World, AGr
 		WorldLocation,
 		WorldLocation + WorldDirection * 10000.f,
 		ECC_Visibility);
-	//DrawDebugLine(World, WorldLocation, WorldLocation + WorldDirection * 10000.f, FColor::Red, true, 5.f, 0, 2.f);
+
 	if(bHit)
 	{
 		Grid = Cast<AGridGenerator>(HitResult.GetActor());
@@ -52,14 +52,12 @@ void UtilityLibrary::UpdateBuildingPiece(UWorld* World, AGridGenerator* Grid, co
 	{
 		TileConfig += Grid->MarchingBits[j / 4][CorrespondingQuad.Points[j % 4]] * pow(10, 8 - j - 1);
 		CornersMask.Add(Grid->MarchingBits[j / 4][CorrespondingQuad.Points[j % 4]]);
-		//DELETE WHEN UPPER PART IS USED
 		if(Grid->MarchingBits[j / 4][CorrespondingQuad.Points[j % 4]])
 		{
 			if(j < 4)
 				LowerCorners.Add(j);
 			else
 				UpperCorners.Add(j);
-			//Corners.Add((j / 4) * 4 + j % 4);
 			if(MinCorner == -1)
 				MinCorner = j;
 		}
