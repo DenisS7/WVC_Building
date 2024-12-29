@@ -1142,6 +1142,7 @@ void AGridGenerator::UpdateBuildingPiece(const int& ElevationLevel, const int& I
 		BuildingPiece = World->SpawnActor<ABuildingPiece>(BuildingPieceToSpawn, CorrespondingQuad.Center, FRotator(0, 0, 0));
 		BuildingPiece->Index = BaseGridPoints[Index].CorrespondingBuildingShape;
 		BuildingPiece->Grid = this;
+		BuildingPiece->Elevation = ElevationLevel;
 		Elevations[ElevationLevel].BuildingPieces.Add(Index, BuildingPiece);
 		UE_LOG(LogTemp, Warning, TEXT("SpawnIndex: %d"), BuildingPiece->Index);
 	}

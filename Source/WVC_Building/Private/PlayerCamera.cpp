@@ -120,8 +120,10 @@ void APlayerCamera::HoverOverShape()
 {
 	AGridGenerator* Grid = nullptr;
 	int Shape = -1;
+	int Elevation = -1;
 	int AdjacentShape = -1;
-	const bool Hit = UtilityLibrary::GetGridAndBuildingMouseIsHoveringOver(GetWorld(), Grid, Shape, AdjacentShape);
+	int AdjacentElevation = -1;
+	const bool Hit = UtilityLibrary::GetGridAndBuildingMouseIsHoveringOver(GetWorld(), Grid, Shape, Elevation, AdjacentShape, AdjacentElevation);
 	if(!Hit || !Grid || Shape < 0)
 	{
 		if(HoveredGrid)
@@ -135,17 +137,29 @@ void APlayerCamera::HoverOverShape()
 	{
 		TArray<FVector> CommonPoints;
 		const TArray<int>& ShapePoints = Grid->GetBuildingGridShapes()[Shape].Points;
-		const TArray<int>& AdjacentShapePoints = Grid->GetBuildingGridShapes()[AdjacentShape].Points;
-		for(int i = 0; i < ShapePoints.Num(); i++)
-			for(int j = 0; j < AdjacentShapePoints.Num(); j++)
+		if(AdjacentElevation != Elevation)
+		{
+			const FVector ElevationDiff = AdjacentElevation < Elevation ? FVector(0.f) : FVector(0.f, 0.f, 200.f);
+			for(int i = 0; i < ShapePoints.Num(); i++)
 			{
-				if(ShapePoints[i] == AdjacentShapePoints[j])
-					CommonPoints.Add(Grid->GetBuildingPointCoordinates(ShapePoints[i]));
+				CommonPoints.Add(Grid->GetBuildingPointCoordinates(ShapePoints[i]) + ElevationDiff);
 			}
-		CommonPoints.Insert(CommonPoints[0] * 0.5f + CommonPoints[1] * 0.5f, 1);
-		for(int i = CommonPoints.Num() - 1; i >= 0; i--)
-			CommonPoints.Add(CommonPoints[i] + FVector(0.f, 0.f, 200.f));
+		}
+		else
+		{
+			const TArray<int>& AdjacentShapePoints = Grid->GetBuildingGridShapes()[AdjacentShape].Points;
+			for(int i = 0; i < ShapePoints.Num(); i++)
+				for(int j = 0; j < AdjacentShapePoints.Num(); j++)
+				{
+					if(ShapePoints[i] == AdjacentShapePoints[j])
+						CommonPoints.Add(Grid->GetBuildingPointCoordinates(ShapePoints[i]));
+				}
+			CommonPoints.Insert(CommonPoints[0] * 0.5f + CommonPoints[1] * 0.5f, 1);
+			for(int i = CommonPoints.Num() - 1; i >= 0; i--)
+				CommonPoints.Add(CommonPoints[i] + FVector(0.f, 0.f, 200.f));
+		}
 		Grid->CreateAdjacentShapeMesh(CommonPoints);
+		//UE_LOG(LogTemp, Warning, TEXT("Current: %d,   Adjacent: %d,    Elevation: %d"), Shape, AdjacentShape, Elevation);
 	}
 }
 

@@ -3,6 +3,7 @@
 #include "BuildingPiece.h"
 #include "GridGenerator.h"
 #include "MeshCornersData.h"
+#include "ProceduralMeshComponent.h"
 #include "VectorTypes.h"
 
 void UtilityLibrary::GetGridAndShapeMouseIsHoveringOver(const UWorld* World, AGridGenerator*& Grid, int& ShapeIndex)
@@ -27,7 +28,7 @@ void UtilityLibrary::GetGridAndShapeMouseIsHoveringOver(const UWorld* World, AGr
 }
 
 bool UtilityLibrary::GetGridAndBuildingMouseIsHoveringOver(const UWorld* World, AGridGenerator*& Grid,
-	int& HitBuildingIndex, int& AdjacentHitBuildingIndex)
+                                                           int& HitBuildingIndex, int& HitBuildingElevation, int& AdjacentHitBuildingIndex, int& AdjacentHitBuildingElevation)
 {
 	if(!World)
 		return false;
@@ -58,21 +59,31 @@ bool UtilityLibrary::GetGridAndBuildingMouseIsHoveringOver(const UWorld* World, 
 			if(BaseShapeIndex < 0)
 				return false;
 			HitBuildingIndex = BaseShapeIndex;
+			HitBuildingElevation = AdjacentHitBuildingElevation = BuildingPiece->GetElevation();
+			const UProceduralMeshComponent* MeshComp = BuildingPiece->GetProceduralMeshComponent();
+			FBoxSphereBounds MeshBounds = MeshComp->GetLocalBounds();
+			if(HitResult.Location.Z < static_cast<float>(AdjacentHitBuildingElevation) * 200.f + 10.f)
+			{
+				--AdjacentHitBuildingElevation;
+				if(AdjacentHitBuildingElevation < 0)
+					return false;
+				AdjacentHitBuildingIndex = BaseShapeIndex;
+				return true;
+			}
+			if(HitResult.Location.Z > static_cast<float>(AdjacentHitBuildingElevation) * 200.f + 2.f * MeshBounds.GetBox().GetExtent().Z - 10.f)
+			{
+				++AdjacentHitBuildingElevation;
+				if(AdjacentHitBuildingElevation > 15)
+					return false;
+				AdjacentHitBuildingIndex = BaseShapeIndex;
+				return true;
+			}
 			
 			const FGridShape GridShape = Grid->GetBuildingGridShapes()[HitBuildingIndex];
 			float LeastDotDiff = 9999999999999999999999.f;
 			
-			FString PointsArray;
-			FString NeighboursArray;
 			for(int i = 0; i < GridShape.Points.Num(); i++)
 			{
-				PointsArray += FString::FromInt(GridShape.Points[i]);
-				PointsArray += ", ";
-				if(i < GridShape.Neighbours.Num())
-				{
-					NeighboursArray += FString::FromInt(GridShape.Neighbours[i]);
-					NeighboursArray += ", ";
-				}
 				const int Index1 = GridShape.Points[i];
 				const int Index2 = GridShape.Points[(i + 1) % GridShape.Points.Num()];
 
@@ -97,11 +108,9 @@ bool UtilityLibrary::GetGridAndBuildingMouseIsHoveringOver(const UWorld* World, 
 					if(GridShape.Neighbours.Num() <= i)
 						return false;
 					AdjacentHitBuildingIndex = GridShape.Neighbours[i];
+					AdjacentHitBuildingElevation = BuildingPiece->GetElevation();
 				}
 			}
-			//UE_LOG(LogTemp, Warning, TEXT("BuildingIndex: %d ----- Adjacent: %d\n"), HitBuildingIndex, AdjacentHitBuildingIndex);
-			//UE_LOG(LogTemp, Warning, TEXT("          Points: %s\n"), *PointsArray);
-			//UE_LOG(LogTemp, Warning, TEXT("          Neighb: %s\n"), *NeighboursArray);
 			return true;
 		}
 	}

@@ -40,6 +40,8 @@ public:
 
 	TObjectPtr<AGridGenerator> GetGrid() const { return Grid; }
 	int GetIndex() const { return Index; }
+	int GetElevation() const { return Elevation; }
+	const UProceduralMeshComponent* GetProceduralMeshComponent() const { return ProceduralMeshComponent; }
 protected:
 	friend AGridGenerator;
 	// Called when the game starts or when spawned
