@@ -120,15 +120,33 @@ void APlayerCamera::HoverOverShape()
 {
 	AGridGenerator* Grid = nullptr;
 	int Shape = -1;
-	UtilityLibrary::GetGridAndShapeMouseIsHoveringOver(GetWorld(), Grid, Shape);
-	if(!Grid || Shape < 0)
+	int AdjacentShape = -1;
+	const bool Hit = UtilityLibrary::GetGridAndBuildingMouseIsHoveringOver(GetWorld(), Grid, Shape, AdjacentShape);
+	if(!Hit || !Grid || Shape < 0)
 	{
 		if(HoveredGrid)
 			HoveredGrid->ResetShapeMesh();
 		return;
 	}
 	HoveredGrid = Grid;
-	Grid->CreateShapeMesh(Shape);
+	if(AdjacentShape < 0)
+		Grid->CreateGridShapeMesh(Shape);
+	else
+	{
+		TArray<FVector> CommonPoints;
+		const TArray<int>& ShapePoints = Grid->GetBuildingGridShapes()[Shape].Points;
+		const TArray<int>& AdjacentShapePoints = Grid->GetBuildingGridShapes()[AdjacentShape].Points;
+		for(int i = 0; i < ShapePoints.Num(); i++)
+			for(int j = 0; j < AdjacentShapePoints.Num(); j++)
+			{
+				if(ShapePoints[i] == AdjacentShapePoints[j])
+					CommonPoints.Add(Grid->GetBuildingPointCoordinates(ShapePoints[i]));
+			}
+		CommonPoints.Insert(CommonPoints[0] * 0.5f + CommonPoints[1] * 0.5f, 1);
+		for(int i = CommonPoints.Num() - 1; i >= 0; i--)
+			CommonPoints.Add(CommonPoints[i] + FVector(0.f, 0.f, 200.f));
+		Grid->CreateAdjacentShapeMesh(CommonPoints);
+	}
 }
 
 void APlayerCamera::DragCamera()

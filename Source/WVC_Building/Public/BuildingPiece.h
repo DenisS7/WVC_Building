@@ -3,9 +3,11 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "GridGenerator.h"
 #include "GameFramework/Actor.h"
 #include "BuildingPiece.generated.h"
 
+class AGridGenerator;
 class UMeshDeformerComponent;
 class UProceduralMeshComponent;
 struct FGridQuad;
@@ -25,6 +27,9 @@ public:
 	UPROPERTY(EditAnywhere)
 	UDataTable* DataTable;
 
+	UPROPERTY(EditAnywhere)
+	TObjectPtr<AGridGenerator> Grid;
+	
 	// Sets default values for this actor's properties
 	ABuildingPiece();
 	// Called every frame
@@ -32,7 +37,11 @@ public:
 	
 	void SetStaticMesh(UStaticMesh* StaticMesh) { StaticMeshComponent->SetStaticMesh(StaticMesh); }
 	void DeformMesh(const TArray<FVector>& CageBase, const float CageHeight, const float Rotation);
+
+	TObjectPtr<AGridGenerator> GetGrid() const { return Grid; }
+	int GetIndex() const { return Index; }
 protected:
+	friend AGridGenerator;
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
 	
@@ -50,5 +59,8 @@ protected:
 	
 	UPROPERTY(EditAnywhere)
 	uint32 QuadIndex = 0;
+
+	UPROPERTY(EditAnywhere)
+	int Index = -1;
 public:	
 };

@@ -3,6 +3,7 @@
 #include "BuildingPiece.h"
 #include "GridGenerator.h"
 #include "MeshCornersData.h"
+#include "VectorTypes.h"
 
 void UtilityLibrary::GetGridAndShapeMouseIsHoveringOver(const UWorld* World, AGridGenerator*& Grid, int& ShapeIndex)
 {
@@ -23,6 +24,88 @@ void UtilityLibrary::GetGridAndShapeMouseIsHoveringOver(const UWorld* World, AGr
 			ShapeIndex = Grid->DetermineWhichGridShapeAPointIsIn(HitResult.Location);
 		}
 	}
+}
+
+bool UtilityLibrary::GetGridAndBuildingMouseIsHoveringOver(const UWorld* World, AGridGenerator*& Grid,
+	int& HitBuildingIndex, int& AdjacentHitBuildingIndex)
+{
+	if(!World)
+		return false;
+	FHitResult HitResult;
+	FVector WorldLocation;
+	FVector WorldDirection;
+	World->GetFirstPlayerController()->DeprojectMousePositionToWorld(WorldLocation, WorldDirection);
+	const bool bHit = World->LineTraceSingleByChannel(HitResult,
+		WorldLocation,
+		WorldLocation + WorldDirection * 10000.f,
+		ECC_Visibility);
+
+	Grid = Cast<AGridGenerator>(HitResult.GetActor());
+	if(Grid)
+	{
+		HitBuildingIndex = Grid->DetermineWhichGridShapeAPointIsIn(HitResult.Location);
+	}
+	else
+	{
+		ABuildingPiece* BuildingPiece = Cast<ABuildingPiece>(HitResult.GetActor());
+		if(BuildingPiece)
+		{
+			Grid = BuildingPiece->GetGrid();
+			if(!Grid)
+				return false;
+			
+			const int BaseShapeIndex = Grid->DetermineWhichGridShapeAPointIsIn(FVector(HitResult.Location.X, HitResult.Location.Y, Grid->GetActorLocation().Z));
+			if(BaseShapeIndex < 0)
+				return false;
+			HitBuildingIndex = BaseShapeIndex;
+			
+			const FGridShape GridShape = Grid->GetBuildingGridShapes()[HitBuildingIndex];
+			float LeastDotDiff = 9999999999999999999999.f;
+			
+			FString PointsArray;
+			FString NeighboursArray;
+			for(int i = 0; i < GridShape.Points.Num(); i++)
+			{
+				PointsArray += FString::FromInt(GridShape.Points[i]);
+				PointsArray += ", ";
+				if(i < GridShape.Neighbours.Num())
+				{
+					NeighboursArray += FString::FromInt(GridShape.Neighbours[i]);
+					NeighboursArray += ", ";
+				}
+				const int Index1 = GridShape.Points[i];
+				const int Index2 = GridShape.Points[(i + 1) % GridShape.Points.Num()];
+
+				const FVector Point1 = Grid->GetBuildingPointCoordinates(Index1);
+				const FVector Point2 = Grid->GetBuildingPointCoordinates(Index2);
+
+				const FVector Segment = Point2 - Point1;
+				FVector Perpendicular = FVector(-Segment.Y, Segment.X, 0.f);
+				Perpendicular.Normalize();
+
+				FVector Direction = GridShape.Center - Point1;
+				Direction.Normalize();
+				//const float Dot = 
+				if(UE::Geometry::Dot(Perpendicular, Direction) < 0.f)
+					Perpendicular *= -1.f;
+				
+				const float DotProduct = UE::Geometry::Dot(Perpendicular, (FVector(HitResult.Location.X, HitResult.Location.Y, 0.f) - FVector(GridShape.Center.X, GridShape.Center.Y, 0.f)).GetSafeNormal());
+
+				if(DotProduct < LeastDotDiff)
+				{
+					LeastDotDiff = DotProduct;
+					if(GridShape.Neighbours.Num() <= i)
+						return false;
+					AdjacentHitBuildingIndex = GridShape.Neighbours[i];
+				}
+			}
+			//UE_LOG(LogTemp, Warning, TEXT("BuildingIndex: %d ----- Adjacent: %d\n"), HitBuildingIndex, AdjacentHitBuildingIndex);
+			//UE_LOG(LogTemp, Warning, TEXT("          Points: %s\n"), *PointsArray);
+			//UE_LOG(LogTemp, Warning, TEXT("          Neighb: %s\n"), *NeighboursArray);
+			return true;
+		}
+	}
+	return false;
 }
 
 // void UtilityLibrary::UpdateBuildingPiece(UWorld* World, AGridGenerator* Grid, const int QuadIndex, const TSubclassOf<ABuildingPiece>& BuildingPieceToSpawn)

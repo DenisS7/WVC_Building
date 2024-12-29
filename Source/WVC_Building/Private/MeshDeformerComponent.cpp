@@ -285,5 +285,5 @@ void UMeshDeformerComponent::DeformMesh(const TArray<UE::Math::TVector<double>>&
         CurrentPointIndex = i;
         DeformedVertices.Add(ComputeSMVCCoordinate(OriginalVertices[i]));
     }
-    ProceduralMeshComp->CreateMeshSection(0, DeformedVertices, Triangles, Normals, UVs, TArray<FColor>(), Tangents, false);
+    ProceduralMeshComp->CreateMeshSection(0, DeformedVertices, Triangles, Normals, UVs, TArray<FColor>(), Tangents, true);
 }

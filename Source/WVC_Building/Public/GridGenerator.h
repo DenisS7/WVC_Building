@@ -29,6 +29,9 @@ struct FGridPoint
 
 	UPROPERTY(BlueprintReadOnly)
 	bool IsEdge = false;
+
+	UPROPERTY(BlueprintReadOnly)
+	int CorrespondingBuildingShape = -1;
 	
 	FGridPoint() {}
 
@@ -138,10 +141,13 @@ struct FVoxelConfig
 
 	UPROPERTY(BlueprintReadOnly)
 	int CorrespondingQuadIndex = -1;
+	
 	UPROPERTY(BlueprintReadOnly)
 	TArray<bool> ConfigurationCorners;
+	
 	UPROPERTY(BlueprintReadOnly)
 	int Elevation = -1;
+	
 	UPROPERTY(BlueprintReadOnly)
 	ABuildingPiece* BuildingPiece = nullptr;
 	
@@ -162,7 +168,7 @@ struct FElevationData
 	TArray<bool> MarchingBits;
 
 	UPROPERTY(BlueprintReadOnly)
-	TMap<int, ABuildingPiece*> BuildingPieces;
+	TMap<int, TObjectPtr<ABuildingPiece>> BuildingPieces;
 
 	FElevationData() {}
 
@@ -260,7 +266,8 @@ public:
 	void DrawGrid();
 	void DrawSecondGrid();
 	void GenerateGrid();
-	void CreateShapeMesh(const int ShapeIndex);
+	void CreateGridShapeMesh(const int ShapeIndex);
+	void CreateAdjacentShapeMesh(const TArray<FVector>& Points);
 	void ResetShapeMesh();
 
 	void UpdateMarchingBit(const int& ElevationLevel, const int& Index, const bool& Value);

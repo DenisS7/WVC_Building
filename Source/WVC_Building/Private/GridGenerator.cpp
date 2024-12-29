@@ -7,14 +7,12 @@
 #include "DebugStrings.h"
 #include "GridGeneratorVis.h"
 #include "MeshCornersData.h"
-#include "PlayerCamera.h"
 #include "Polygon2.h"
 #include "Components/DynamicMeshComponent.h"
-#include "Components/WidgetComponent.h"
-#include "Runtime/Core/Tests/Containers/TestUtils.h"
 #include "GeometryScript/MeshPrimitiveFunctions.h"
 #include "GeometryScript/MeshNormalsFunctions.h"
-#include "Kismet/GameplayStatics.h"
+#include "GeometryScript/MeshModelingFunctions.h"
+#include "GeometryScript/MeshSelectionFunctions.h"
 
 // Sets default values
 AGridGenerator::AGridGenerator()
@@ -286,6 +284,14 @@ void AGridGenerator::DivideGridIntoQuads(const FVector& GridCenter, TArray<FGrid
 			}
 		}
 	}
+
+	for(int i = 0; i < BaseGridPoints.Num(); i++)
+	{
+		FGridShape Shape(-1, BaseGridPoints[i].Neighbours, -1);
+		SortShapePoints(Shape, false);
+		BaseGridPoints[i].Neighbours = Shape.Points;
+	}
+	
 	for(int i = 0; i < BaseGridQuads.Num() - 1; i++)
 	{
 		for(int j = i + 1; j < BaseGridQuads.Num(); j++)
@@ -352,7 +358,7 @@ void AGridGenerator::CreateWholeGridMesh()
 	UGeometryScriptLibrary_MeshNormalsFunctions::ComputeSplitNormals(WholeGridMesh->GetDynamicMesh(), FGeometryScriptSplitNormalsOptions(), FGeometryScriptCalculateNormalsOptions());
 }
 
-void AGridGenerator::CreateShapeMesh(const int ShapeIndex)
+void AGridGenerator::CreateGridShapeMesh(const int ShapeIndex)
 {
 	UE::Geometry::FPolygon2d MeshPolygon;
 	for(int i = 0; i < BuildingGridShapes[ShapeIndex].Points.Num(); i++)
@@ -379,6 +385,51 @@ void AGridGenerator::CreateShapeMesh(const int ShapeIndex)
 	BodySetup->CreatePhysicsMeshes(); 
 	HoveredShapeMesh->RecreatePhysicsState();
 	UGeometryScriptLibrary_MeshNormalsFunctions::ComputeSplitNormals(HoveredShapeMesh->GetDynamicMesh(), FGeometryScriptSplitNormalsOptions(), FGeometryScriptCalculateNormalsOptions());
+}
+
+void AGridGenerator::CreateAdjacentShapeMesh(const TArray<FVector>& Points)
+{
+	FVector Center;
+	for(int i = 0; i < Points.Num(); i++)
+		Center += Points[i];
+	Center /= Points.Num();
+	TArray<FVector> NewPoints;
+	for(int i = 0; i < Points.Num(); i++)
+		NewPoints.Add(Points[i] - Center);
+	TArray<FVector> MeshPolygon;
+	for(int i = 0; i < NewPoints.Num(); i++)
+	{
+		MeshPolygon.Add(NewPoints[i]);
+	}
+	HoveredShapeMesh->GetDynamicMesh()->Reset();
+	//float MeshHeight = 10.f;
+	FTransform MeshTransform = FTransform();
+	MeshTransform.SetLocation(Center);//FVector(MeshTransform.GetLocation().X, MeshTransform.GetLocation().Y, GetActorLocation().Z));
+	//UGeometryScriptLibrary_MeshPrimitiveFunctions::Append
+	
+	UGeometryScriptLibrary_MeshPrimitiveFunctions::AppendTriangulatedPolygon3D(HoveredShapeMesh->GetDynamicMesh(),
+	FGeometryScriptPrimitiveOptions(),
+	MeshTransform,
+	MeshPolygon);
+	FGeometryScriptMeshSelection Selection;
+	
+	UGeometryScriptLibrary_MeshSelectionFunctions::CreateSelectAllMeshSelection(HoveredShapeMesh->GetDynamicMesh(), Selection);
+	FVector FaceNormal = UE::Geometry::Cross(Points[1] - Points[0], Points[2] - Points[0]);
+	FaceNormal.Normalize();
+	
+	FGeometryScriptMeshLinearExtrudeOptions LinearExtrudeOptions(5.f, EGeometryScriptLinearExtrudeDirection::AverageFaceNormal, FaceNormal);
+	UGeometryScriptLibrary_MeshModelingFunctions::ApplyMeshLinearExtrudeFaces(HoveredShapeMesh->GetDynamicMesh(), LinearExtrudeOptions, Selection);
+
+	HoveredShapeMesh->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+	UBodySetup* BodySetup = HoveredShapeMesh->GetBodySetup();
+	BodySetup->CollisionTraceFlag = CTF_UseComplexAsSimple;
+	HoveredShapeMesh->EnableComplexAsSimpleCollision();
+	BodySetup->AggGeom.ConvexElems.Empty();
+	BodySetup->CreatePhysicsMeshes(); 
+	HoveredShapeMesh->RecreatePhysicsState();
+	
+	UGeometryScriptLibrary_MeshNormalsFunctions::ComputeSplitNormals(HoveredShapeMesh->GetDynamicMesh(), FGeometryScriptSplitNormalsOptions(), FGeometryScriptCalculateNormalsOptions());
+
 }
 
 void AGridGenerator::ResetShapeMesh()
@@ -423,6 +474,7 @@ void AGridGenerator::CreateSecondGrid()
 			ShapePoints.Add(BaseGridPoints[i].PartOfQuads[j]);
 		}
 		BuildingGridShapes.Emplace(BuildingGridShapes.Num(), ShapePoints, i);
+		BaseGridPoints[i].CorrespondingBuildingShape = BuildingGridShapes.Num() - 1;
 		SortShapePoints(BuildingGridShapes.Last());
 	}
 	
@@ -453,6 +505,48 @@ void AGridGenerator::CreateSecondGrid()
 				}
 			}
 		}
+	}
+
+	for(int i = 0; i < BuildingGridShapes.Num(); i++)
+	{
+		TArray<int> ShapePoints;
+		for(int j = 0; j < BuildingGridShapes[i].Neighbours.Num(); j++)
+			ShapePoints.Add(BuildingGridShapes[BuildingGridShapes[i].Neighbours[j]].CorrespondingBaseGridPoint);
+		FGridShape Shape(-1, ShapePoints, -1);
+		SortShapePoints(Shape, false);
+		TArray<int> NewNeighbourArray;
+		for(int j = 0; j < Shape.Points.Num(); j++)
+		{
+			NewNeighbourArray.Add(BaseGridPoints[Shape.Points[j]].CorrespondingBuildingShape);
+		}
+		BuildingGridShapes[i].Neighbours = NewNeighbourArray;
+		const FVector CenterPoint1 = BuildingGridPoints[BuildingGridShapes[i].Points[0]].Location - BuildingGridShapes[i].Center;
+		float LeastAngle = -999999999999999.f;
+		int Neighbour1 = -1;
+ 		for(int j = 0; j < BuildingGridShapes[i].Neighbours.Num(); j++)
+		{
+			const int NeighbourIndex = BuildingGridShapes[i].Neighbours[j];
+			const FVector CenterNeighbour = BuildingGridShapes[NeighbourIndex].Center - BuildingGridShapes[i].Center;\
+			const float Dot = UE::Geometry::Dot(CenterPoint1, CenterNeighbour);
+			const FVector Cross = UE::Geometry::Cross(CenterPoint1, CenterNeighbour);
+
+			float Angle = FMath::Atan2(Cross.Z, Dot);
+			if(Angle < 0.f)
+				Angle += 2.f * PI;
+
+			if(Angle > LeastAngle)
+			{
+				LeastAngle = Angle;
+				Neighbour1 = j;
+			}
+		}
+
+		NewNeighbourArray.Empty();
+		for(int j = Neighbour1; j < Shape.Points.Num() + Neighbour1; j++)
+		{
+			NewNeighbourArray.Add(BaseGridPoints[Shape.Points[j % Shape.Points.Num()]].CorrespondingBuildingShape);
+		}
+		BuildingGridShapes[i].Neighbours = NewNeighbourArray;
 	}
 }
 
@@ -1037,15 +1131,19 @@ void AGridGenerator::UpdateBuildingPiece(const int& ElevationLevel, const int& I
 		CageBase.Add(GetBasePointCoordinates(CorrespondingQuad.Points[k]));
 	const auto Find = Elevations[ElevationLevel].BuildingPieces.Find(Index);
 	ABuildingPiece* BuildingPiece;
-	if(!Find)
-	{
-		BuildingPiece = World->SpawnActor<ABuildingPiece>(BuildingPieceToSpawn, CorrespondingQuad.Center, FRotator(0, 0, 0));
-		Elevations[ElevationLevel].BuildingPieces.Add(Index, BuildingPiece);
-	}
-	else
+	if(Find)
 	{
 		BuildingPiece = *Find;
 		BuildingPiece->Corners.Empty();
+	}
+	else
+	{
+		FActorSpawnParameters SpawnParameters;
+		BuildingPiece = World->SpawnActor<ABuildingPiece>(BuildingPieceToSpawn, CorrespondingQuad.Center, FRotator(0, 0, 0));
+		BuildingPiece->Index = BaseGridPoints[Index].CorrespondingBuildingShape;
+		BuildingPiece->Grid = this;
+		Elevations[ElevationLevel].BuildingPieces.Add(Index, BuildingPiece);
+		UE_LOG(LogTemp, Warning, TEXT("SpawnIndex: %d"), BuildingPiece->Index);
 	}
 	int TileConfig = 0;
 	TArray<int> LowerCorners;
