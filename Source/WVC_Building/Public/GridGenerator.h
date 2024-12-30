@@ -92,14 +92,17 @@ struct FGridTriangle
 	}
 };
 
-UENUM(BlueprintType)
-enum class EShape : uint8
+USTRUCT(BlueprintType)
+struct FShapeQuadPointsForBP
 {
-	Triangle = 3,
-	Quad = 4,
-	Pentagon = 5,
-	Hexagon = 6,
-	None = 0
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadOnly)
+	TArray<FVector> Points;
+
+	FShapeQuadPointsForBP () {}
+	
+	explicit FShapeQuadPointsForBP(const TArray<FVector>& InPoints) : Points(InPoints) {}
 };
 
 USTRUCT(BlueprintType)
@@ -115,22 +118,25 @@ struct FGridShape
 	
 	UPROPERTY(BlueprintReadOnly)
 	TArray<int> Neighbours;
+
+	UPROPERTY(BlueprintReadOnly)
+	TArray<int> OffsetNeighbours;
 	
 	UPROPERTY(BlueprintReadOnly)
 	int CorrespondingBaseGridPoint = 0;
 	
 	UPROPERTY(BlueprintReadOnly)
 	FVector Center = FVector::ZeroVector;
-
+	
 	UPROPERTY(BlueprintReadOnly)
-	EShape Shape = EShape::None;
-
+	TArray<FShapeQuadPointsForBP> ComposingQuads;
+	
 	FGridShape() {}
 	
 	FGridShape(const int InIndex, const TArray<int>& InPoints, const int InCorrespondingGrid1Point)
 		: Index(InIndex), Points(InPoints), CorrespondingBaseGridPoint(InCorrespondingGrid1Point)
 	{
-		Shape = static_cast<EShape>(InPoints.Num());
+		
 	}
 };
 

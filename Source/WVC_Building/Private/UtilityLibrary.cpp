@@ -82,8 +82,23 @@ bool UtilityLibrary::GetGridAndBuildingMouseIsHoveringOver(const UWorld* World, 
 			const FGridShape GridShape = Grid->GetBuildingGridShapes()[HitBuildingIndex];
 			float LeastDotDiff = 9999999999999999999999.f;
 			
+			//FString PointsArray;
+			//FString NeighboursArray;
+			//FString OffsetNeighboursArray;
 			for(int i = 0; i < GridShape.Points.Num(); i++)
 			{
+				//PointsArray += FString::FromInt(GridShape.Points[i]);
+				//PointsArray += ", ";
+				//if(i < GridShape.Neighbours.Num())
+				//{
+				//	NeighboursArray += FString::FromInt(GridShape.Neighbours[i]);
+				//	NeighboursArray += ", ";
+				//}
+				//if(i < GridShape.OffsetNeighbours.Num())
+				//{
+				//	OffsetNeighboursArray += FString::FromInt(GridShape.OffsetNeighbours[i]);
+				//	OffsetNeighboursArray += ", ";
+				//}
 				const int Index1 = GridShape.Points[i];
 				const int Index2 = GridShape.Points[(i + 1) % GridShape.Points.Num()];
 
@@ -105,12 +120,18 @@ bool UtilityLibrary::GetGridAndBuildingMouseIsHoveringOver(const UWorld* World, 
 				if(DotProduct < LeastDotDiff)
 				{
 					LeastDotDiff = DotProduct;
-					if(GridShape.Neighbours.Num() <= i)
+					if(GridShape.OffsetNeighbours.Num() <= i)
 						return false;
-					AdjacentHitBuildingIndex = GridShape.Neighbours[i];
+					AdjacentHitBuildingIndex = GridShape.OffsetNeighbours[i];
 					AdjacentHitBuildingElevation = BuildingPiece->GetElevation();
 				}
 			}
+			//UE_LOG(LogTemp, Warning, TEXT("BuildingIndex: %d ----- Adjacent: %d\n"), HitBuildingIndex, AdjacentHitBuildingIndex);
+			//UE_LOG(LogTemp, Warning, TEXT("          Points: %s\n"), *PointsArray);
+			//UE_LOG(LogTemp, Warning, TEXT("          Neighb: %s\n"), *NeighboursArray);
+			//UE_LOG(LogTemp, Warning, TEXT("          OffsetNeighb: %s\n"), *OffsetNeighboursArray);
+			if(AdjacentHitBuildingIndex == -1)
+				return false;
 			return true;
 		}
 	}

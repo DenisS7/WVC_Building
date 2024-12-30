@@ -135,6 +135,15 @@ void APlayerCamera::HoverOverShape()
 		Grid->CreateGridShapeMesh(Shape);
 	else
 	{
+		FlushPersistentDebugLines(GetWorld());
+		for(int i = 0; i < Grid->GetBuildingGridShapes()[Shape].ComposingQuads.Num(); i+= 4)
+		{
+			const TArray<FVector>& Points = Grid->GetBuildingGridShapes()[Shape].ComposingQuads[i].Points;
+			for(int j = 0; j < Points.Num(); j++)
+			{
+				DrawDebugLine(GetWorld(), Points[j] + FVector(0.f, 0.f, 175.f), Points[(j + 1) % Points.Num()] + FVector(0.f, 0.f, 175.f), FColor::Green, true, 100.f, 0, 2.f);
+			}
+		}
 		TArray<FVector> CommonPoints;
 		const TArray<int>& ShapePoints = Grid->GetBuildingGridShapes()[Shape].Points;
 		if(AdjacentElevation != Elevation)
