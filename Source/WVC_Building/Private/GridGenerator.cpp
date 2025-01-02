@@ -33,6 +33,11 @@ AGridGenerator::AGridGenerator()
 	CreateSecondGridDelegate = FTimerDelegate::CreateUObject(this, &AGridGenerator::CreateSecondGrid);
 }
 
+UWorld* AGridGenerator::GetGridWorld() const
+{
+	return GetWorld();
+}
+
 // Called when the game starts or when spawned
 void AGridGenerator::BeginPlay()
 {

@@ -291,7 +291,9 @@ public:
 	const TArray<FGridQuad>& GetBaseGridQuads() const { return BaseGridQuads; }
 	const TArray<FGridShape>& GetBuildingGridShapes() const { return BuildingGridShapes; }
 	const FElevationData& GetElevationData(const int& Level) const { return Elevations[Level]; }
-	
+
+	UFUNCTION(BlueprintCallable, Category = "GridGenerator")
+	UWorld* GetGridWorld() const;
 protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
