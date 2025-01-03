@@ -39,7 +39,7 @@ public:
 	void DeformMesh(const TArray<FVector>& CageBase, const float CageHeight, const float Rotation);
 
 	TObjectPtr<AGridGenerator> GetGrid() const { return Grid; }
-	int GetIndex() const { return Index; }
+	int GetIndex() const { return CorrespondingQuadIndex; }
 	int GetElevation() const { return Elevation; }
 	const UProceduralMeshComponent* GetProceduralMeshComponent() const { return ProceduralMeshComponent; }
 protected:
@@ -55,14 +55,14 @@ protected:
 	
 	UPROPERTY(EditAnywhere)
 	UMeshDeformerComponent* MeshDeformerComponent = nullptr;
-	
-	UPROPERTY(EditAnywhere)
-	uint32 Elevation = 0;
-	
-	UPROPERTY(EditAnywhere)
-	uint32 QuadIndex = 0;
 
-	UPROPERTY(EditAnywhere)
-	int Index = -1;
+	UPROPERTY(BlueprintReadWrite)
+	float MeshRotation = 0.f;
+	
+	UPROPERTY(BlueprintReadWrite)
+	int Elevation = 0;
+
+	UPROPERTY(BlueprintReadWrite)
+	int CorrespondingQuadIndex = -1;
 public:	
 };

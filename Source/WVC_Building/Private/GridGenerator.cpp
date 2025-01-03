@@ -71,6 +71,7 @@ void AGridGenerator::GenerateGrid()
 	BaseGridQuads.Empty();
 	DebugOnlyPerfectQuads.Empty();
 	Elevations.Empty();
+	FlushPersistentDebugLines(GetWorld());
 	
 	BaseGridCenter = GetActorLocation();
 	BaseGridPoints.Emplace(BaseGridPoints.Num(), BaseGridCenter);
@@ -81,7 +82,29 @@ void AGridGenerator::GenerateGrid()
 
 	TArray<FGridTriangle> Triangles = DivideGridIntoTriangles(BaseGridCenter);
 	DivideGridIntoQuads(BaseGridCenter, Triangles);
+	ReorderQuadNeighbours();
 	RelaxAndCreateSecondGrid();
+
+	TArray<FColor> Colors = {FColor::Red, FColor::Green, FColor::Blue, FColor::Yellow, FColor::Purple, FColor::Emerald, FColor::Magenta};
+	for(int i = 0; i < BaseGridQuads.Num(); i += 23)
+	{
+		DrawDebugBox(GetWorld(), BaseGridQuads[i].Center, FVector(8.f), FColor::Black, true, -1, 0, 5.f);
+		//for(int j = 0; j < 4; j++)
+		//{
+		for(int j = 0; j < 4; j++)
+		{
+			DrawDebugSphere(GetWorld(), BaseGridPoints[BaseGridQuads[i].Points[j]].Location, 10.f + j * 3.f, 3, Colors[j], true, -1, 0, 3.f); 
+			if(BaseGridQuads[i].OffsetNeighbours[j] != -1)
+				DrawDebugLine(GetWorld(), BaseGridQuads[i].Center, BaseGridQuads[BaseGridQuads[i].OffsetNeighbours[j]].Center, Colors[j], true, -1, 0, 5.f);
+		}
+	}
+
+	UE_LOG(LogTemp, Warning, TEXT("\n\n"));
+	for(int i = 0; i < BaseGridQuads[0].Points.Num(); i++)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("Point: %d  ----- Neighbour: %d"), BaseGridQuads[0].Points[i], BaseGridQuads[0].OffsetNeighbours[i]);
+	}
+	UE_LOG(LogTemp, Warning, TEXT("\n\n"));
 }
 
 void AGridGenerator::GenerateHexCoordinates(const FVector& GridCenter, const float HexSize, const uint32 HexIndex)
@@ -877,6 +900,70 @@ void AGridGenerator::RelaxAndCreateSecondGrid()
 	}
 }
 
+void AGridGenerator::ReorderQuadNeighbours()
+{
+	for(int i = 0; i < BaseGridQuads.Num(); i++)
+	{
+		//Ordering neighbours in counter clockwise order
+		FGridQuad& CurrentQuad = BaseGridQuads[i];
+		TArray<FVector> NeighbourCenters;
+		TArray<int> NewNeighbourOrder;
+
+		for(int j = 0; j < CurrentQuad.Neighbours.Num(); j++)
+			NeighbourCenters.Add(BaseGridQuads[CurrentQuad.Neighbours[j]].Center);
+
+		SortPoints(NeighbourCenters, NewNeighbourOrder);
+		TArray<int> NeighbourCopy;// = 
+		
+		for(int j = 0; j < NewNeighbourOrder.Num(); j++)
+		{
+			NeighbourCopy.Add(CurrentQuad.Neighbours[NewNeighbourOrder[j]]);
+		}
+
+		const FVector Point1 = BaseGridPoints[CurrentQuad.Points[0]].Location - CurrentQuad.Center;
+		float LeastAngle = -9999999999999.f;
+		int Neighbour1 = 0;
+
+		for(int j = 0; j < NeighbourCopy.Num(); j++)
+		{
+			if(NeighbourCopy[j] == -1)
+				continue;
+			const int NeighbourIndex = NeighbourCopy[j];
+			const FVector CenterNeighbour = BaseGridQuads[NeighbourIndex].Center - CurrentQuad.Center;
+			const float Dot = UE::Geometry::Dot(Point1.GetSafeNormal(), CenterNeighbour.GetSafeNormal());
+			const FVector Cross = UE::Geometry::Cross(Point1.GetSafeNormal(), CenterNeighbour.GetSafeNormal());
+
+			float Angle = FMath::Atan2(Cross.Z, Dot);
+			if(Angle < 0.f)
+				Angle += 2.f * PI;
+
+			if(Angle > LeastAngle)
+			{
+				LeastAngle = Angle;
+				Neighbour1 = j;
+			}
+		}
+
+		CurrentQuad.Neighbours.Empty();
+		CurrentQuad.OffsetNeighbours.Empty();
+		for(int j = Neighbour1; j < NeighbourCopy.Num() + Neighbour1; j++)
+		{
+			const int NeighbourIndex = NeighbourCopy[j % NeighbourCopy.Num()];
+			if(NeighbourIndex != -1)
+				CurrentQuad.Neighbours.Add(NeighbourIndex);
+			CurrentQuad.OffsetNeighbours.Add(NeighbourIndex);
+		}
+
+		for(int j = 0; j < CurrentQuad.Points.Num(); j++)
+		{
+			if(BaseGridPoints[CurrentQuad.Points[j]].IsEdge && BaseGridPoints[CurrentQuad.Points[(j + 1) % CurrentQuad.Points.Num()]].IsEdge)
+			{
+				CurrentQuad.OffsetNeighbours.Insert(-1, j);
+			}
+		}
+	}
+}
+
 void AGridGenerator::Relax1()
 {
 	if(PerfectEqualSquareOrder == 1)
@@ -987,6 +1074,47 @@ void AGridGenerator::SortShapePoints(FGridShape& Shape, const bool SecondGrid)
 	{
 		Shape.Points[i] = CopyPoints[Angles[i].Index];
 	}
+}
+
+TArray<FVector> AGridGenerator::SortPoints(const TArray<FVector>& Points, TArray<int>& NewOrder)
+{
+	FVector Center = FVector::ZeroVector;
+	for(int i = 0; i < Points.Num(); i++)
+		Center += Points[i];
+	Center /= Points.Num();
+	
+	struct FPointAngle
+	{
+		int Index;
+		float Angle;
+
+		FPointAngle(const int InIndex, const float InAngle)
+		{
+			Index = InIndex;
+			Angle = InAngle;
+		}
+	};
+	
+	TArray<FPointAngle> Angles;
+	for(int i = 0; i < Points.Num(); i++)
+	{
+		const FVector& GridCoordinate = Points[i];
+		Angles.Add(FPointAngle(i, FMath::Atan2(GridCoordinate.Y - Center.Y, GridCoordinate.X - Center.X)));
+	}
+	Angles.Sort([](const FPointAngle& A, const FPointAngle& B)
+	{
+		return A.Angle > B.Angle; // Clockwise sorting
+	});
+	
+	TArray<FVector> Output;
+	NewOrder.Empty();
+	for(int i = 0; i < Points.Num(); i++)
+	{
+		Output.Add(Points[Angles[i].Index]);
+		NewOrder.Add(Angles[i].Index);
+	}
+
+	return Output;
 }
 
 int AGridGenerator::GetOrAddMidpointIndexInBaseGrid(TMap<TPair<int, int>, int>& Midpoints, int Point1, int Point2)
@@ -1187,11 +1315,11 @@ void AGridGenerator::UpdateBuildingPiece(const int& ElevationLevel, const int& I
 	{
 		FActorSpawnParameters SpawnParameters;
 		BuildingPiece = World->SpawnActor<ABuildingPiece>(BuildingPieceToSpawn, CorrespondingQuad.Center, FRotator(0, 0, 0));
-		BuildingPiece->Index = BaseGridPoints[Index].CorrespondingBuildingShape;
+		BuildingPiece->CorrespondingQuadIndex = Index;
 		BuildingPiece->Grid = this;
 		BuildingPiece->Elevation = ElevationLevel;
 		Elevations[ElevationLevel].BuildingPieces.Add(Index, BuildingPiece);
-		UE_LOG(LogTemp, Warning, TEXT("SpawnIndex: %d"), BuildingPiece->Index);
+		UE_LOG(LogTemp, Warning, TEXT("SpawnIndex: %d"), BuildingPiece->CorrespondingQuadIndex);
 	}
 	int TileConfig = 0;
 	TArray<int> LowerCorners;
@@ -1245,6 +1373,8 @@ void AGridGenerator::UpdateBuildingPiece(const int& ElevationLevel, const int& I
 		}
 	}
 
+	BuildingPiece->MeshRotation = Rotation;
+	
 	if(!LowerCorners.Num() && !UpperCorners.Num())
 	{
 		Elevations[ElevationLevel].BuildingPieces.Remove(Index);

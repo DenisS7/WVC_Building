@@ -59,6 +59,9 @@ struct FGridQuad
 	UPROPERTY(BlueprintReadOnly)
 	TArray<int> Neighbours;
 	
+	UPROPERTY(BlueprintReadOnly)
+	TArray<int> OffsetNeighbours;
+	
 	FGridQuad() {}
 
 	FGridQuad(const TArray<int>& InPoints, const int InIndex)
@@ -301,6 +304,7 @@ protected:
 	void FindPointNeighboursInQuad(const int QuadIndex);
 	void SortQuadPoints(FGridQuad& Quad);
 	void SortShapePoints(FGridShape& Shape, bool SecondGrid = true);
+	TArray<FVector> SortPoints(const TArray<FVector>& Points, TArray<int>& NewOrder);
 	int GetOrAddMidpointIndexInBaseGrid(TMap<TPair<int, int>, int>& Midpoints, int Point1, int Point2);
 	bool IsPointInShape(const FVector& Point, const FGridShape& Quad) const;
 	
@@ -318,6 +322,7 @@ protected:
 	TArray<FGridTriangle> DivideGridIntoTriangles(const FVector& GridCenter);
 	void DivideGridIntoQuads(const FVector& GridCenter, TArray<FGridTriangle>& Triangles);
 	void RelaxAndCreateSecondGrid();
+	void ReorderQuadNeighbours();
 
 	UPROPERTY(BlueprintReadOnly)
 	FVector BaseGridCenter = FVector::ZeroVector;

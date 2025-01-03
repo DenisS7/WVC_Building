@@ -9,6 +9,18 @@
 /**
  * 
  */
+
+UENUM(BlueprintType)
+enum class EEdgeSide : uint8
+{
+	Bottom = 0,
+	Left = 1,
+	Back = 2,
+	Right = 3,
+	Front = 4,
+	Top = 5
+};
+
 UCLASS(BlueprintType)
 class WVC_BUILDING_API UAllMeshData : public UObject
 {
@@ -21,7 +33,7 @@ public:
 	//UAllMeshData(const UAllMeshData&) = delete;
 
 	UFUNCTION(BlueprintCallable, Category = "MeshDataSingleton")
-	void ProcessMeshData(UWorld* World, const FVector& Center, const UStaticMesh* StaticMesh);
+	void ProcessMeshData(UWorld* World, const FVector& Center, float Rotation, const UStaticMesh* StaticMesh);
 
 	//const TArray<int>& GetMeshData(const UStaticMesh* StaticMesh) const;
 private:

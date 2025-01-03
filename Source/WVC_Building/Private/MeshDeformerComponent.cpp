@@ -272,12 +272,12 @@ void UMeshDeformerComponent::DeformMesh(const TArray<UE::Math::TVector<double>>&
     
     TArray<FColor> Colors = {FColor::Red, FColor::Green, FColor::Blue, FColor::Yellow, FColor::Purple, FColor::White};
     
-    FlushPersistentDebugLines(GetWorld());
+    //FlushPersistentDebugLines(GetWorld());
     for(int i = 0; i < CageFaces.Num(); i++)
     {
         for(int j = 0; j < CageFaces[i].Num(); j++)
         {
-            DrawDebugLine(GetWorld(), CageVertices[CageFaces[i][j]], CageVertices[CageFaces[i][(j + 1) % CageFaces[i].Num()]], Colors[i], false, 100.f, 0, 2.f);
+            //DrawDebugLine(GetWorld(), CageVertices[CageFaces[i][j]], CageVertices[CageFaces[i][(j + 1) % CageFaces[i].Num()]], Colors[i], false, 100.f, 0, 2.f);
         }
     }
     for(int i = 0; i < OriginalVertices.Num(); i++)
