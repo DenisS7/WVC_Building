@@ -41,6 +41,7 @@ public:
 private:
 	static UAllMeshData* Instance;
 
+	TMap<TArray<FIntVector>, TArray<FIntVector>> EdgeVariations;
 	TMap<TArray<FIntVector>, int> EdgeCode;
 	TMap<TSoftObjectPtr<UStaticMesh*>, TArray<int>> MeshEdges;
 	

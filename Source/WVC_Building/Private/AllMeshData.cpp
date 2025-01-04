@@ -63,16 +63,12 @@ bool UAllMeshData::ProcessMeshData(UWorld* World, const FVector& Center, const f
 	const FRawStaticIndexBuffer& Index2Buffer = LODResource.AdditionalIndexBuffers->WireframeIndexBuffer;
 	TMap<FIntPoint, int> Edges;
 	TMap<int, int> CorrectVertex;
-	TArray<int> All;
 
-	
-	TArray<int> RemoveIndices;
-	
+	//Duplicate vertex
 	for(int i = 0; i < IndexBuffer.GetNumIndices(); i++)
 	{
 		const int Index = IndexBuffer.GetIndex(i);
 		bool Found = false;
-		All.AddUnique(Index);
 		if(CorrectVertex.Contains(Index))
 			continue;
 		for(int j = i + 1; j < IndexBuffer.GetNumIndices(); j++)
@@ -82,7 +78,6 @@ bool UAllMeshData::ProcessMeshData(UWorld* World, const FVector& Center, const f
 				continue;
 			if(FVector3f::DistSquared(VertexBuffer.VertexPosition(Index), VertexBuffer.VertexPosition(Index2)) < 0.01f)
 			{
-				RemoveIndices.AddUnique(Index2);
 				CorrectVertex.FindOrAdd(Index2, Index);
 				CorrectVertex.FindOrAdd(Index, Index);
 				Found = true;
@@ -92,14 +87,7 @@ bool UAllMeshData::ProcessMeshData(UWorld* World, const FVector& Center, const f
 			CorrectVertex.FindOrAdd(Index, Index);
 	}
 
-	for(int i = 0; i < RemoveIndices.Num(); i++)
-		All.Remove(RemoveIndices[i]);
-
-	TArray<FVector> VertexPositions;
-
-	for(int i = 0; i < All.Num(); i++)
-		VertexPositions.Add(static_cast<FVector>(VertexBuffer.VertexPosition(All[i])));
-	
+	//Edge face count
 	for (int i = 0; i < IndexBuffer.GetNumIndices(); i += 3)
 	{
 		const int OGIndex0 = IndexBuffer.GetIndex(i);
@@ -119,6 +107,7 @@ bool UAllMeshData::ProcessMeshData(UWorld* World, const FVector& Center, const f
 		Edges.FindOrAdd(Edge3)++;
 	}
 
+	//Border points
 	TArray<int> EdgePoints;
 	for(const auto& Edge : Edges)
 	{
@@ -127,11 +116,6 @@ bool UAllMeshData::ProcessMeshData(UWorld* World, const FVector& Center, const f
 			EdgePoints.AddUnique(Edge.Key.X);
 			EdgePoints.AddUnique(Edge.Key.Y);
 		}
-	}
-
-	for(int i = 0; i < EdgePoints.Num(); i++)
-	{
-		//DrawDebugSphere(World, Center + static_cast<FVector>(VertexBuffer.VertexPosition(EdgePoints[i])), 2.f, 3, FColor::Yellow, true, -1, 0, 2.f);
 	}
 
 	MeshEdges.Add(StaticMesh);
@@ -146,12 +130,12 @@ bool UAllMeshData::ProcessMeshData(UWorld* World, const FVector& Center, const f
 
 	TArray<FVector> Mult = {FVector(1.f, 1.f, 0.f),
 							FVector(1.f, 0.f, 1.f),
+							FVector(0.f, 1.f, 1.f),
 							FVector(1.f, 0.f, 1.f),
-							FVector(1.f, 0.f, 1.f),
-							FVector(1.f, 0.f, 1.f),
+							FVector(0.f, 1.f, 1.f),
 							FVector(1.f, 1.f, 0.f)};
 	
-	
+	//Face borders
 	for(int i = 0; i < EdgePoints.Num(); i++)
 	{
 		const FVector PointCoord = static_cast<FVector>(VertexBuffer.VertexPosition(EdgePoints[i]));
@@ -191,11 +175,6 @@ bool UAllMeshData::ProcessMeshData(UWorld* World, const FVector& Center, const f
 		{
 			int Index = static_cast<int>(Side);
 			FVector SidePoint = PointCoord;
-			if(Side == EEdgeSide::Left || Side == EEdgeSide::Right)
-			{
-				//rotate
-				SidePoint = SidePoint.RotateAngleAxis(270.f, FVector(0.f, 0.f, 1.f));
-			}
 			SidePoint *= Mult[Index];
 			const float X = FMath::RoundHalfFromZero(SidePoint.X * 100.f);
 			const float Y = FMath::RoundHalfFromZero(SidePoint.Y * 100.f);
@@ -208,6 +187,7 @@ bool UAllMeshData::ProcessMeshData(UWorld* World, const FVector& Center, const f
 
 	TArray<TArray<int>> ExtraPoints;
 
+	//Detect extra points
 	for(int i = 0; i < MeshBorders.Num(); i++)
 	{
 		const EEdgeSide Side = static_cast<EEdgeSide>(i);
@@ -245,6 +225,7 @@ bool UAllMeshData::ProcessMeshData(UWorld* World, const FVector& Center, const f
 		}
 	}
 
+	//Remove extra points
 	for(int i = 0; i < ExtraPoints.Num(); i++)
 	{
 		for(int j = 0; j < ExtraPoints[i].Num(); j++)
@@ -255,39 +236,83 @@ bool UAllMeshData::ProcessMeshData(UWorld* World, const FVector& Center, const f
 	}
 
 	TArray<int> EdgeCodes;
-	
+
+	auto Comparator = [](const FIntVector& A, const FIntVector& B)
+	{
+		if (A.X > B.X)
+			return true;
+		if (A.X < B.X)
+			return false;
+
+		if (A.Y > B.Y)
+			return true;
+		if (A.Y < B.Y)
+			return false;
+
+		if (A.Z > B.Z)
+			return true;
+		if (A.Z < B.Z)
+			return false;
+
+		return true; // Adjust as needed
+	};
+
+	//Get or add border code
 	for(int i = 0; i < MeshBordersVector.Num(); i++)
 	{
-		MeshBordersVector[i].Sort([](const FIntVector& A, const FIntVector& B)
+		const EEdgeSide Side = static_cast<EEdgeSide>(i);
+		MeshBordersVector[i].Sort(Comparator);
+		TArray<FIntVector>* FoundVector = EdgeVariations.Find(MeshBordersVector[i]);
+		if(FoundVector)
 		{
-			if(A.X > B.X)
-				return true;
-			if(A.X < B.X)
-				return false;
-			
-			if(A.Y > B.Y)
-				return true;
-			if(A.Y < B.Y)
-				return false;
-			
-			if(A.Z > B.Z)
-				return true;
-			if(A.Z < B.Z)
-				return false;
-			
-			return true;
-		});
-		int* F = EdgeCode.Find(MeshBordersVector[i]);
-		if(F)
-		{
-			UE_LOG(LogTemp, Display, TEXT("Mesh: %s - Edge code found: %d"), *StaticMesh->GetPathName(), *F);
+			UE_LOG(LogTemp, Display, TEXT("Mesh: %s - Edge code found: %d"), *StaticMesh->GetPathName(), EdgeCode[*FoundVector]);
 		}
 		else
-			EdgeCode.FindOrAdd(MeshBordersVector[i], EdgeCode.Num() + 1);
-		EdgeCodes.Add(*EdgeCode.Find(MeshBordersVector[i]));
+		{
+			EdgeCode.Add(MeshBordersVector[i], EdgeCode.Num() + 1);
+			TArray<FIntVector> FlippedVector = MeshBordersVector[i];
+			TArray<FIntVector> RotatedVector = MeshBordersVector[i];
+			TArray<FIntVector> FlippedRotatedVector = MeshBordersVector[i];
+			if(Side == EEdgeSide::Front || Side == EEdgeSide::Back)
+			{
+				for(int j = 0; j < FlippedVector.Num(); j++)
+				{
+					FlippedVector[j].X *= -1;
+				}
+				
+				for(int j = 0; j < RotatedVector.Num(); j++)
+				{
+					Swap(RotatedVector[j].X, RotatedVector[j].Y);
+					Swap(FlippedRotatedVector[j].X, FlippedRotatedVector[j].Y);
+					FlippedRotatedVector[j].Y *= -1;
+				}
+			}
+			else if(Side == EEdgeSide::Left || Side == EEdgeSide::Right)
+			{
+				for(int j = 0; j < FlippedVector.Num(); j++)
+				{
+					FlippedVector[j].Y *= -1;
+				}
+				
+				for(int j = 0; j < RotatedVector.Num(); j++)
+				{
+					Swap(RotatedVector[j].X, RotatedVector[j].Y);
+					Swap(FlippedRotatedVector[j].X, FlippedRotatedVector[j].Y);
+					FlippedRotatedVector[j].X *= -1;
+				}
+			}
+
+			FlippedVector.Sort(Comparator);
+			RotatedVector.Sort(Comparator);
+			FlippedRotatedVector.Sort(Comparator);
+			EdgeVariations.Add(MeshBordersVector[i], MeshBordersVector[i]);
+			EdgeVariations.Add(FlippedVector, MeshBordersVector[i]);
+			EdgeVariations.Add(RotatedVector, MeshBordersVector[i]);
+			EdgeVariations.Add(FlippedRotatedVector, MeshBordersVector[i]);
+		}
+		EdgeCodes.Add(EdgeCode[EdgeVariations[MeshBordersVector[i]]]);
 	}
 	MeshEdges.Add(StaticMesh, EdgeCodes);
-
 	
 	EdgeCodesOut.SetNumZeroed(6);
 	int Cycle = (4 - (static_cast<int>((Rotation) / 90.f))) % 4;
@@ -304,7 +329,7 @@ bool UAllMeshData::ProcessMeshData(UWorld* World, const FVector& Center, const f
 	EdgeCodesOut[5] = MeshEdges[StaticMesh][5];
 	
 
-//
+	//Debug
 	TArray<FColor> PieceColors = {FColor::Black, FColor::Red, FColor::Blue, FColor::Green, FColor::Yellow, FColor::Purple};
 	
 	for(int i = 0; i < MeshBorders.Num(); i++)
