@@ -216,6 +216,9 @@ public:
 	
 	UPROPERTY(EditAnywhere, Category = "Show Debug")
 	bool ShowBuildingGridQuadIndices = false;
+
+	UPROPERTY(EditAnywhere, Category = "Show Debug")
+	bool ShowMeshEdgeCodes = false;
 	
 	UPROPERTY(EditAnywhere)
 	float FirstHexSize = 50.f;

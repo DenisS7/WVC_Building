@@ -14,10 +14,10 @@ UENUM(BlueprintType)
 enum class EEdgeSide : uint8
 {
 	Bottom = 0,
-	Left = 1,
-	Back = 2,
-	Right = 3,
-	Front = 4,
+	Front = 1,
+	Left = 2,
+	Back = 3,
+	Right = 4,
 	Top = 5
 };
 
@@ -33,13 +33,15 @@ public:
 	//UAllMeshData(const UAllMeshData&) = delete;
 
 	UFUNCTION(BlueprintCallable, Category = "MeshDataSingleton")
-	void ProcessMeshData(UWorld* World, const FVector& Center, float Rotation, const UStaticMesh* StaticMesh);
+	bool ProcessMeshData(UWorld* World, const FVector& Center, float Rotation, const UStaticMesh* StaticMesh, TArray<int>& EdgeCodesOut);
 
+	UFUNCTION(BlueprintCallable, Category = "MeshDataSingleton")
+	void GetAllEdgeCodes(TArray<FString>& MeshNames, TArray<FString>& MeshEdgeCodes, TArray<FString>& AllEdgeKeys, TArray<int>& AllEdgeValues);
 	//const TArray<int>& GetMeshData(const UStaticMesh* StaticMesh) const;
 private:
 	static UAllMeshData* Instance;
 
-	TMap<TArray<FVector>, int> EdgeCode;
+	TMap<TArray<FIntVector>, int> EdgeCode;
 	TMap<TSoftObjectPtr<UStaticMesh*>, TArray<int>> MeshEdges;
 	
 	UAllMeshData(); 

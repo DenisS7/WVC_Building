@@ -19,25 +19,42 @@ UAllMeshData* UAllMeshData::GetInstance()
 	return Instance;
 }
 
-void UAllMeshData::ProcessMeshData(UWorld* World, const FVector& Center, const float Rotation, const UStaticMesh* StaticMesh)
+bool UAllMeshData::ProcessMeshData(UWorld* World, const FVector& Center, const float Rotation, const UStaticMesh* StaticMesh, TArray<int>& EdgeCodesOut)
 {
 	if(!World)
 	{
 		UE_LOG(LogTemp, Warning, TEXT("Invalid World!"));
-		return;
+		return false;
 	}
 	if (!StaticMesh)
 	{
 		UE_LOG(LogTemp, Warning, TEXT("Invalid StaticMesh"));
-		return;
+		return false;
 	}
-	//if(MeshEdges.Contains(StaticMesh))
-	//	return;
+	MeshEdges.Empty();
+	
+	if(MeshEdges.Contains(StaticMesh))
+	{
+		EdgeCodesOut.SetNumZeroed(6);
+		int Cycle = (4 - (static_cast<int>((Rotation) / 90.f))) % 4;
+		for(int i = 1; i < 5; i++)
+		{
+			int NewIndex = i - Cycle;
+			if(NewIndex <= 0)
+				NewIndex += 4;
+			if(NewIndex >= 5)
+				NewIndex -= 4;
+			EdgeCodesOut[i] = MeshEdges[StaticMesh][NewIndex];
+		}
+		EdgeCodesOut[0] = MeshEdges[StaticMesh][0];
+		EdgeCodesOut[5] = MeshEdges[StaticMesh][5];
+		return true;
+	}
 	const FStaticMeshRenderData* RenderData = StaticMesh->GetRenderData();
 	if(!RenderData || !RenderData->LODResources.Num())
 	{
 		UE_LOG(LogTemp, Warning, TEXT("Invalid RenderData"));
-		return;
+		return false;
 	}
 	const FStaticMeshLODResources& LODResource = RenderData->LODResources[0];
 	const FPositionVertexBuffer& VertexBuffer = LODResource.VertexBuffers.PositionVertexBuffer;
@@ -120,55 +137,111 @@ void UAllMeshData::ProcessMeshData(UWorld* World, const FVector& Center, const f
 	MeshEdges.Add(StaticMesh);
 	MeshEdges[StaticMesh].SetNum(6);
 
-	const float PieceExtent = 75.f - 1.f;
+	const float PieceExtent = 100.f - 1.f;
 	
 	const FVector Up = FVector(0.f, 0.f, 1.f);
 	const FVector Right = FVector(0.f, 1.f, 0.f);
 	const FVector Forward = FVector(1.f, 0.f, 0.f);
 
-	const TArray<FVector> Direction = {-Up, -Right,	-Forward, Right, Forward, Up};
-
-	const TArray<float> PieceExtents = {-PieceExtent, -PieceExtent, -PieceExtent, PieceExtent, PieceExtent, PieceExtent};
-
 	TArray<TArray<int>> MeshBorders;
+	TArray<TArray<FIntVector>> MeshBordersVector;
 	MeshBorders.SetNum(6);
+	MeshBordersVector.SetNum(6);
 	
 	for(int i = 0; i < EdgePoints.Num(); i++)
 	{
-		FVector PointCoord = static_cast<FVector>(VertexBuffer.VertexPosition(EdgePoints[i]));
-		//for(int j = 0; j < Direction.Num(); j++)
-		{
-			if(PointCoord.X > PieceExtent)
-			{
-				MeshBorders[static_cast<int>(EEdgeSide::Front)].Add(EdgePoints[i]);
-			}
-			else if(PointCoord.X < -PieceExtent)
-			{
-				MeshBorders[static_cast<int>(EEdgeSide::Back)].Add(EdgePoints[i]);
-			}
+		const FVector PointCoord = static_cast<FVector>(VertexBuffer.VertexPosition(EdgePoints[i]));
+		const float X = FMath::RoundHalfFromZero(PointCoord.X * 100.f);
+		const float Y = FMath::RoundHalfFromZero(PointCoord.Y * 100.f);
+		const float Z = FMath::RoundHalfFromZero(PointCoord.Z * 100.f);
+		const FIntVector IntPoint = FIntVector(static_cast<int>(X / 10.f), static_cast<int>(Y / 10.f), static_cast<int>(Z / 10.f));
 
-			if(PointCoord.Y > PieceExtent)
-			{
-				MeshBorders[static_cast<int>(EEdgeSide::Right)].Add(EdgePoints[i]);
-			}
-			else if(PointCoord.Y < -PieceExtent)
-			{
-				MeshBorders[static_cast<int>(EEdgeSide::Left)].Add(EdgePoints[i]);
-			}
-			
-			if(PointCoord.Z > 2.f * PieceExtent - 1.f)
-			{
-				MeshBorders[static_cast<int>(EEdgeSide::Top)].Add(EdgePoints[i]);
-			}
-			else if(PointCoord.Z < 1.f)
-			{
-				MeshBorders[static_cast<int>(EEdgeSide::Bottom)].Add(EdgePoints[i]);
-			}
+		//Forward
+		if(PointCoord.Y > PieceExtent)
+		{
+			MeshBorders[static_cast<int>(EEdgeSide::Front)].Add(EdgePoints[i]);
+			FIntVector CopyPoint = IntPoint;
+			CopyPoint.Y = 0;
+			MeshBordersVector[static_cast<int>(EEdgeSide::Front)].Add(CopyPoint);
+		}
+		else if(PointCoord.Y < -PieceExtent)
+		{
+			MeshBorders[static_cast<int>(EEdgeSide::Back)].Add(EdgePoints[i]);
+			FIntVector CopyPoint = IntPoint;
+			CopyPoint.Y = 0;
+			MeshBordersVector[static_cast<int>(EEdgeSide::Back)].Add(CopyPoint);
+		}
+
+		//Sides
+		if(PointCoord.X < -PieceExtent)
+		{
+			MeshBorders[static_cast<int>(EEdgeSide::Right)].Add(EdgePoints[i]);
+			FIntVector CopyPoint = IntPoint;
+			CopyPoint.X = 0;
+			MeshBordersVector[static_cast<int>(EEdgeSide::Right)].Add(CopyPoint);
+		}
+		else if(PointCoord.X > PieceExtent)
+		{
+			MeshBorders[static_cast<int>(EEdgeSide::Left)].Add(EdgePoints[i]);
+			FIntVector CopyPoint = IntPoint;
+			CopyPoint.X = 0;
+			MeshBordersVector[static_cast<int>(EEdgeSide::Left)].Add(CopyPoint);
+		}
+
+		//Vertical
+		if(PointCoord.Z > 2.f * PieceExtent + 1.f)
+		{
+			MeshBorders[static_cast<int>(EEdgeSide::Top)].Add(EdgePoints[i]);
+			FIntVector CopyPoint = IntPoint;
+			CopyPoint.Z = 0;
+			MeshBordersVector[static_cast<int>(EEdgeSide::Top)].Add(CopyPoint);
+		}
+		else if(PointCoord.Z < 1.f)
+		{
+			MeshBorders[static_cast<int>(EEdgeSide::Bottom)].Add(EdgePoints[i]);
+			FIntVector CopyPoint = IntPoint;
+			CopyPoint.Z = 0;
+			MeshBordersVector[static_cast<int>(EEdgeSide::Bottom)].Add(CopyPoint);
 		}
 	}
 
-	int Cycle = Rotation / 90.f;
-	TArray<TArray<int>> CopyMeshBorders = MeshBorders;
+	TArray<int> EdgeCodes;
+	
+	for(int i = 0; i < MeshBordersVector.Num(); i++)
+	{
+		MeshBordersVector[i].Sort([](const FIntVector& A, const FIntVector& B)
+		{
+			if(A.X > B.X)
+				return true;
+			if(A.X < B.X)
+				return false;
+			
+			if(A.Y > B.Y)
+				return true;
+			if(A.Y < B.Y)
+				return false;
+			
+			if(A.Z > B.Z)
+				return true;
+			if(A.Z < B.Z)
+				return false;
+			
+			return true;
+		});
+		int* F = EdgeCode.Find(MeshBordersVector[i]);
+		if(F)
+		{
+			UE_LOG(LogTemp, Display, TEXT("Mesh: %s - Edge code found: %d"), *StaticMesh->GetPathName(), *F);
+		}
+		else
+			EdgeCode.FindOrAdd(MeshBordersVector[i], EdgeCode.Num() + 1);
+		EdgeCodes.Add(*EdgeCode.Find(MeshBordersVector[i]));
+	}
+	MeshEdges.Add(StaticMesh, EdgeCodes);
+
+	
+	EdgeCodesOut.SetNumZeroed(6);
+	int Cycle = (4 - (static_cast<int>((Rotation) / 90.f))) % 4;
 	for(int i = 1; i < 5; i++)
 	{
 		int NewIndex = i - Cycle;
@@ -176,13 +249,13 @@ void UAllMeshData::ProcessMeshData(UWorld* World, const FVector& Center, const f
 			NewIndex += 4;
 		if(NewIndex >= 5)
 			NewIndex -= 4;
-		MeshBorders[i] = CopyMeshBorders[NewIndex];
-		for(int j = 0; j < MeshBorders[i].Num(); j++)
-		{
-			//MeshBorders[i][j] =MeshBorders[i][j]
-		}
+		EdgeCodesOut[i] = MeshEdges[StaticMesh][NewIndex];
 	}
+	EdgeCodesOut[0] = MeshEdges[StaticMesh][0];
+	EdgeCodesOut[5] = MeshEdges[StaticMesh][5];
+	
 
+//
 	TArray<FColor> PieceColors = {FColor::Black, FColor::Red, FColor::Blue, FColor::Green, FColor::Yellow, FColor::Purple};
 	
 	for(int i = 0; i < MeshBorders.Num(); i++)
@@ -191,9 +264,49 @@ void UAllMeshData::ProcessMeshData(UWorld* World, const FVector& Center, const f
 		{
 			FVector Point = static_cast<FVector>(VertexBuffer.VertexPosition(MeshBorders[i][j]));
 			//if(i >= 1 && i <= 4)
-				//Point = Point.RotateAngleAxis(Rotation, FVector(0.f, 0.f, 1.f));
-			DrawDebugSphere(World, Center + Point, 1.5f + static_cast<float>(i) * 0.5f, 3, PieceColors[i], true, -1, 0, 2.f);
-		}}
+			//Point = Point.RotateAngleAxis(Rotation, FVector(0.f, 0.f, 1.f));
+			//DrawDebugSphere(World, Center + Point, 1.5f + static_cast<float>(i) * 0.5f, 3, PieceColors[i], true, -1, 0, 2.f);
+		}
+	}
+	
+	return true;
+}
+
+void UAllMeshData::GetAllEdgeCodes(TArray<FString>& MeshNames, TArray<FString>& MeshEdgeCodes, TArray<FString>& AllEdgeKeys, TArray<int>& AllEdgeValues)
+{
+	AllEdgeKeys.Empty();
+	AllEdgeValues.Empty();
+	MeshNames.Empty();
+	MeshEdgeCodes.Empty();
+	
+	for(auto Edge : EdgeCode)
+	{
+		FString EdgeString = "";
+		for(int i = 0; i < Edge.Key.Num(); i++)
+		{
+			EdgeString += "(";
+			EdgeString += FString::FromInt(Edge.Key[i].X);
+			EdgeString += ", ";
+			EdgeString += FString::FromInt(Edge.Key[i].X);
+			EdgeString += ", ";
+			EdgeString += FString::FromInt(Edge.Key[i].X);
+			EdgeString += "), ";
+		}
+		AllEdgeKeys.Add(EdgeString);
+		AllEdgeValues.Add(Edge.Value);
+	}
+
+	for(auto Mesh : MeshEdges)
+	{
+		MeshNames.Add(Mesh.Key.GetAssetName());
+		FString EdgesCodes = "";
+		for(int i = 0; i < Mesh.Value.Num(); i++)
+		{
+			EdgesCodes += FString::FromInt(Mesh.Value[i]);
+			EdgesCodes += "  ";
+		}
+		MeshEdgeCodes.Add(EdgesCodes);
+	}
 }
 
 //

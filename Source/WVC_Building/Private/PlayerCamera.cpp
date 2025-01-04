@@ -113,7 +113,7 @@ void APlayerCamera::OnMiddleMouseButtonReleased()
 
 void APlayerCamera::OnMouseWheelAxis(float AxisValue)
 {
-	SpringArm->TargetArmLength = FMath::Clamp(AxisValue * -1.f * ZoomFactor + SpringArm->TargetArmLength, 1500.f, 5000.f);
+	SpringArm->TargetArmLength = FMath::Clamp(AxisValue * -1.f * ZoomFactor + SpringArm->TargetArmLength, 500.f, 5000.f);
 }
 
 void APlayerCamera::HoverOverShape()

@@ -32,6 +32,20 @@ void ABuildingPiece::BeginPlay()
 void ABuildingPiece::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
+
+	//if(CorrespondingQuadIndex != 45)
+	//	return;
+	const FGridQuad& Quad = Grid->GetBaseGridQuads()[CorrespondingQuadIndex];
+				
+	for(int i = 0; i < Quad.Points.Num(); i++)
+	{
+		FVector Pos = (Grid->GetBasePointCoordinates(Quad.Points[i]) + Grid->GetBasePointCoordinates(Quad.Points[(i + 1) % Quad.Points.Num()])) / 2.f;
+		Pos.Z = 0.f;
+		FVector Direction = (Quad.Center - Pos).GetSafeNormal();
+		Pos += Direction * 30.f; 
+		Pos.Z = 200.f;
+		DrawDebugString(GetWorld(), Pos - Quad.Center, FString::FromInt(EdgeCodes[i + 1]), this, FColor::Black, 1.f);
+	}
 }
 
 void ABuildingPiece::DeformMesh(const TArray<FVector>& CageBase, const float CageHeight, const float Rotation)

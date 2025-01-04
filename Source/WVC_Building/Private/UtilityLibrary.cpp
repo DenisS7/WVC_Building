@@ -44,7 +44,10 @@ bool UtilityLibrary::GetGridAndBuildingMouseIsHoveringOver(const UWorld* World, 
 	Grid = Cast<AGridGenerator>(HitResult.GetActor());
 	if(Grid)
 	{
+		HitBuildingIndex = -1;
 		HitBuildingIndex = Grid->DetermineWhichGridShapeAPointIsIn(HitResult.Location);
+		if(HitBuildingIndex != -1)
+			return true;
 	}
 	else
 	{

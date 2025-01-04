@@ -23,6 +23,9 @@ public:
 	
 	UPROPERTY(EditAnywhere)
 	TArray<int> Corners;
+
+	UPROPERTY(EditAnywhere)
+	TArray<int> EdgeCodes;
 	
 	UPROPERTY(EditAnywhere)
 	UDataTable* DataTable;
@@ -41,6 +44,8 @@ public:
 	TObjectPtr<AGridGenerator> GetGrid() const { return Grid; }
 	int GetIndex() const { return CorrespondingQuadIndex; }
 	int GetElevation() const { return Elevation; }
+	float GetRotation() const { return MeshRotation; }
+	const TArray<int>& GetEdgeCodes() const { return EdgeCodes; }
 	const UProceduralMeshComponent* GetProceduralMeshComponent() const { return ProceduralMeshComponent; }
 protected:
 	friend AGridGenerator;

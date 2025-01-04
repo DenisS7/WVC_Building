@@ -3,6 +3,7 @@
 
 #include "GridGenerator.h"
 
+#include "AllMeshData.h"
 #include "BuildingPiece.h"
 #include "DebugStrings.h"
 #include "GridGeneratorVis.h"
@@ -82,20 +83,23 @@ void AGridGenerator::GenerateGrid()
 
 	TArray<FGridTriangle> Triangles = DivideGridIntoTriangles(BaseGridCenter);
 	DivideGridIntoQuads(BaseGridCenter, Triangles);
-	ReorderQuadNeighbours();
 	RelaxAndCreateSecondGrid();
+	ReorderQuadNeighbours();
 
 	TArray<FColor> Colors = {FColor::Red, FColor::Green, FColor::Blue, FColor::Yellow, FColor::Purple, FColor::Emerald, FColor::Magenta};
-	for(int i = 0; i < BaseGridQuads.Num(); i += 23)
+	for(int i = 0; i < BaseGridQuads.Num(); i += 2)
 	{
-		DrawDebugBox(GetWorld(), BaseGridQuads[i].Center, FVector(8.f), FColor::Black, true, -1, 0, 5.f);
+		//DrawDebugBox(GetWorld(), BaseGridQuads[i].Center, FVector(8.f), FColor::Black, true, -1, 0, 5.f);
 		//for(int j = 0; j < 4; j++)
 		//{
-		for(int j = 0; j < 4; j++)
+		for(int j = 0; j < 1; j++)
 		{
-			DrawDebugSphere(GetWorld(), BaseGridPoints[BaseGridQuads[i].Points[j]].Location, 10.f + j * 3.f, 3, Colors[j], true, -1, 0, 3.f); 
+			//DrawDebugSphere(GetWorld(), BaseGridPoints[BaseGridQuads[i].Points[j]].Location, 10.f + j * 3.f, 3, Colors[j], true, -1, 0, 3.f); 
 			if(BaseGridQuads[i].OffsetNeighbours[j] != -1)
-				DrawDebugLine(GetWorld(), BaseGridQuads[i].Center, BaseGridQuads[BaseGridQuads[i].OffsetNeighbours[j]].Center, Colors[j], true, -1, 0, 5.f);
+			{
+				const FVector Direction = (BaseGridQuads[BaseGridQuads[i].OffsetNeighbours[j]].Center - BaseGridQuads[i].Center).GetSafeNormal();
+				//DrawDebugLine(GetWorld(), BaseGridQuads[i].Center, BaseGridQuads[BaseGridQuads[i].OffsetNeighbours[j]].Center - Direction * 50.f, Colors[j], true, -1, 0, 5.f);
+			}
 		}
 	}
 
@@ -1319,7 +1323,9 @@ void AGridGenerator::UpdateBuildingPiece(const int& ElevationLevel, const int& I
 		BuildingPiece->Grid = this;
 		BuildingPiece->Elevation = ElevationLevel;
 		Elevations[ElevationLevel].BuildingPieces.Add(Index, BuildingPiece);
-		UE_LOG(LogTemp, Warning, TEXT("SpawnIndex: %d"), BuildingPiece->CorrespondingQuadIndex);
+		//UE_LOG(LogTemp, Warning, TEXT("SpawnIndex: %d"), BuildingPiece->CorrespondingQuadIndex);
+
+		DrawDebugBox(GetWorld(), BaseGridPoints[CorrespondingQuad.Points[0]].Location + FVector(0.f, 0.f, 160.f), FVector(5.f), FColor::Red, false, 10, 0, 2.f);
 	}
 	int TileConfig = 0;
 	TArray<int> LowerCorners;
@@ -1343,6 +1349,7 @@ void AGridGenerator::UpdateBuildingPiece(const int& ElevationLevel, const int& I
 	
 	if(LowerCorners.Num())
 	{
+		//Arranging so the first lower corner is the least number
 		if(LowerCorners.Num() >= 2)
 		{
 			for(int j = 0; j < LowerCorners.Num() - 1; j++)
@@ -1394,4 +1401,5 @@ void AGridGenerator::UpdateBuildingPiece(const int& ElevationLevel, const int& I
 	const auto Row = BuildingPiece->DataTable->FindRow<FMeshCornersData>(RowName, "MeshCornersRow");
 	BuildingPiece->SetStaticMesh(Row->Mesh);
 	BuildingPiece->DeformMesh(CageBase, 200.f, Rotation);
+	UAllMeshData::GetInstance()->ProcessMeshData(GetWorld(), BuildingPiece->GetActorLocation(), Rotation, BuildingPiece->StaticMeshComponent->GetStaticMesh(), BuildingPiece->EdgeCodes);
 }
