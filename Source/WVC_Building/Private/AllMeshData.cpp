@@ -138,70 +138,119 @@ bool UAllMeshData::ProcessMeshData(UWorld* World, const FVector& Center, const f
 	MeshEdges[StaticMesh].SetNum(6);
 
 	const float PieceExtent = 100.f - 1.f;
-	
-	const FVector Up = FVector(0.f, 0.f, 1.f);
-	const FVector Right = FVector(0.f, 1.f, 0.f);
-	const FVector Forward = FVector(1.f, 0.f, 0.f);
 
 	TArray<TArray<int>> MeshBorders;
 	TArray<TArray<FIntVector>> MeshBordersVector;
 	MeshBorders.SetNum(6);
 	MeshBordersVector.SetNum(6);
+
+	TArray<FVector> Mult = {FVector(1.f, 1.f, 0.f),
+							FVector(1.f, 0.f, 1.f),
+							FVector(1.f, 0.f, 1.f),
+							FVector(1.f, 0.f, 1.f),
+							FVector(1.f, 0.f, 1.f),
+							FVector(1.f, 1.f, 0.f)};
+	
 	
 	for(int i = 0; i < EdgePoints.Num(); i++)
 	{
 		const FVector PointCoord = static_cast<FVector>(VertexBuffer.VertexPosition(EdgePoints[i]));
-		const float X = FMath::RoundHalfFromZero(PointCoord.X * 100.f);
-		const float Y = FMath::RoundHalfFromZero(PointCoord.Y * 100.f);
-		const float Z = FMath::RoundHalfFromZero(PointCoord.Z * 100.f);
-		const FIntVector IntPoint = FIntVector(static_cast<int>(X / 10.f), static_cast<int>(Y / 10.f), static_cast<int>(Z / 10.f));
 
+		TArray<EEdgeSide> Sides;
 		//Forward
 		if(PointCoord.Y > PieceExtent)
 		{
-			MeshBorders[static_cast<int>(EEdgeSide::Front)].Add(EdgePoints[i]);
-			FIntVector CopyPoint = IntPoint;
-			CopyPoint.Y = 0;
-			MeshBordersVector[static_cast<int>(EEdgeSide::Front)].Add(CopyPoint);
+			Sides.Add(EEdgeSide::Front);
 		}
 		else if(PointCoord.Y < -PieceExtent)
 		{
-			MeshBorders[static_cast<int>(EEdgeSide::Back)].Add(EdgePoints[i]);
-			FIntVector CopyPoint = IntPoint;
-			CopyPoint.Y = 0;
-			MeshBordersVector[static_cast<int>(EEdgeSide::Back)].Add(CopyPoint);
+			Sides.Add(EEdgeSide::Back);
 		}
 
 		//Sides
 		if(PointCoord.X < -PieceExtent)
 		{
-			MeshBorders[static_cast<int>(EEdgeSide::Right)].Add(EdgePoints[i]);
-			FIntVector CopyPoint = IntPoint;
-			CopyPoint.X = 0;
-			MeshBordersVector[static_cast<int>(EEdgeSide::Right)].Add(CopyPoint);
+			Sides.Add(EEdgeSide::Right);
 		}
 		else if(PointCoord.X > PieceExtent)
 		{
-			MeshBorders[static_cast<int>(EEdgeSide::Left)].Add(EdgePoints[i]);
-			FIntVector CopyPoint = IntPoint;
-			CopyPoint.X = 0;
-			MeshBordersVector[static_cast<int>(EEdgeSide::Left)].Add(CopyPoint);
+			Sides.Add(EEdgeSide::Left);
 		}
 
 		//Vertical
 		if(PointCoord.Z > 2.f * PieceExtent + 1.f)
 		{
-			MeshBorders[static_cast<int>(EEdgeSide::Top)].Add(EdgePoints[i]);
-			FIntVector CopyPoint = IntPoint;
-			CopyPoint.Z = 0;
-			MeshBordersVector[static_cast<int>(EEdgeSide::Top)].Add(CopyPoint);
+			Sides.Add(EEdgeSide::Top);
 		}
 		else if(PointCoord.Z < 1.f)
 		{
-			MeshBorders[static_cast<int>(EEdgeSide::Bottom)].Add(EdgePoints[i]);
-			FIntVector CopyPoint = IntPoint;
-			CopyPoint.Z = 0;
-			MeshBordersVector[static_cast<int>(EEdgeSide::Bottom)].Add(CopyPoint);
+			Sides.Add(EEdgeSide::Bottom);
+		}
+
+		for(const EEdgeSide& Side : Sides)
+		{
+			int Index = static_cast<int>(Side);
+			FVector SidePoint = PointCoord;
+			if(Side == EEdgeSide::Left || Side == EEdgeSide::Right)
+			{
+				//rotate
+				SidePoint = SidePoint.RotateAngleAxis(270.f, FVector(0.f, 0.f, 1.f));
+			}
+			SidePoint *= Mult[Index];
+			const float X = FMath::RoundHalfFromZero(SidePoint.X * 100.f);
+			const float Y = FMath::RoundHalfFromZero(SidePoint.Y * 100.f);
+			const float Z = FMath::RoundHalfFromZero(SidePoint.Z * 100.f);
+			const FIntVector IntPoint = FIntVector(static_cast<int>(X / 10.f), static_cast<int>(Y / 10.f), static_cast<int>(Z / 10.f));
+			MeshBorders[Index].Add(EdgePoints[i]);
+			MeshBordersVector[Index].Add(IntPoint);
+		}
+	}
+
+	TArray<TArray<int>> ExtraPoints;
+
+	for(int i = 0; i < MeshBorders.Num(); i++)
+	{
+		const EEdgeSide Side = static_cast<EEdgeSide>(i);
+		ExtraPoints.Add(TArray<int>());
+		for(int j = 0; j < MeshBorders[i].Num(); j++)
+		{
+			FVector CurrentPoint = static_cast<FVector>(VertexBuffer.VertexPosition(MeshBorders[i][j]));
+			bool Found = false;
+			for(int k = 0; k < MeshBorders[i].Num(); k++)
+			{
+				if(k == j)
+					continue;
+				FVector PrevPoint = static_cast<FVector>(VertexBuffer.VertexPosition(MeshBorders[i][k]));
+				const float Dist1 = FVector::Distance(CurrentPoint, PrevPoint);
+				for(int p = k + 1; p < MeshBorders[i].Num(); p++)
+				{
+					if(p == j)
+						continue;
+					FVector NextPoint = static_cast<FVector>(VertexBuffer.VertexPosition(MeshBorders[i][p]));
+					const float Dist2 = FVector::Distance(CurrentPoint, NextPoint);
+					const float Dist3 = FVector::Distance(PrevPoint, NextPoint);
+					
+					if(FMath::Abs(Dist1 + Dist2 - Dist3) < 0.0001f)
+					{
+						ExtraPoints[i].Add(j);
+						Found = true;
+						break;
+					}
+				}
+				if(Found == true)
+				{
+					break;
+				}
+			}
+		}
+	}
+
+	for(int i = 0; i < ExtraPoints.Num(); i++)
+	{
+		for(int j = 0; j < ExtraPoints[i].Num(); j++)
+		{
+			MeshBorders[i].RemoveAt(ExtraPoints[i][j]);
+			MeshBordersVector[i].RemoveAt(ExtraPoints[i][j]);
 		}
 	}
 

@@ -87,7 +87,7 @@ void AGridGenerator::GenerateGrid()
 	ReorderQuadNeighbours();
 
 	TArray<FColor> Colors = {FColor::Red, FColor::Green, FColor::Blue, FColor::Yellow, FColor::Purple, FColor::Emerald, FColor::Magenta};
-	for(int i = 0; i < BaseGridQuads.Num(); i += 2)
+	for(int i = 0; i < BaseGridQuads.Num(); i++)
 	{
 		//DrawDebugBox(GetWorld(), BaseGridQuads[i].Center, FVector(8.f), FColor::Black, true, -1, 0, 5.f);
 		//for(int j = 0; j < 4; j++)
@@ -101,6 +101,17 @@ void AGridGenerator::GenerateGrid()
 				//DrawDebugLine(GetWorld(), BaseGridQuads[i].Center, BaseGridQuads[BaseGridQuads[i].OffsetNeighbours[j]].Center - Direction * 50.f, Colors[j], true, -1, 0, 5.f);
 			}
 		}
+
+		const FGridQuad& Quad = BaseGridQuads[i];
+		for(int j = 0; j < Quad.Points.Num(); j++)
+		{
+			FVector Pos = (GetBasePointCoordinates(Quad.Points[j]) + GetBasePointCoordinates(Quad.Points[(j + 1) % Quad.Points.Num()])) / 2.f;
+		FVector Pos2 = (GetBasePointCoordinates(Quad.Points[(j + 1) % Quad.Points.Num()]) + GetBasePointCoordinates(Quad.Points[(j + 2) % Quad.Points.Num()])) / 2.f;
+			Pos.Z = Pos2.Z = 0.f;
+			DrawDebugLine(GetWorld(), Pos, Pos2, Colors[j], true, -1, 0, 3.f);
+			//DrawDebugString(GetWorld(), Pos - Quad.Center, FString::FromInt(EdgeCodes[i + 1]), this, FColor::Black, 1.f);
+		}
+
 	}
 
 	UE_LOG(LogTemp, Warning, TEXT("\n\n"));
