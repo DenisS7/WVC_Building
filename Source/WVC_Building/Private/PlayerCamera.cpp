@@ -84,15 +84,18 @@ void APlayerCamera::OnRightMouseButtonPressed()
 {
 	IsDragging = true;
 	AGridGenerator* Grid = nullptr;
-	int Shape = -1;
-	UtilityLibrary::GetGridAndShapeMouseIsHoveringOver(GetWorld(), Grid, Shape);
+	int HitBuildingIndex = -1;
+	int HitBuildingElevation = -1;
+	int AdjacentBuildingIndex = -1;
+	int AdjacentBuildingElevation = -1;
+	bool Hit = UtilityLibrary::GetGridAndBuildingMouseIsHoveringOver(GetWorld(), Grid, HitBuildingIndex, HitBuildingElevation, AdjacentBuildingIndex, AdjacentBuildingElevation);
 
-	if(!Grid || Shape < 0)
+	if(!Hit || !Grid || HitBuildingIndex < 0)
 	{
 		return;
 	}
 	
-	const FGridShape& GridShape = Grid->GetBuildingGridShapes()[Shape];
+	const FGridShape& GridShape = Grid->GetBuildingGridShapes()[HitBuildingIndex];
 	Grid->UpdateMarchingBit(0, GridShape.CorrespondingBaseGridPoint, false);
 }
 
