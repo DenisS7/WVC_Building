@@ -90,7 +90,7 @@ void AGridGenerator::GenerateGrid()
 	TArray<FColor> Colors = {FColor::Red, FColor::Green, FColor::Blue, FColor::Yellow, FColor::Purple, FColor::Emerald, FColor::Magenta};
 	for(int i = 0; i < BuildingGridShapes.Num(); i++)
 	{
-		for(int j = 0; j < BuildingGridShapes[i].ComposingQuads.Num() && j < 1; j++)
+		for(int j = 0; j < BuildingGridShapes[i].ComposingQuads.Num(); j++)
 		{
 			for(int k = 0; k < BuildingGridShapes[i].ComposingQuads[j].Points.Num(); k++)
 			{
@@ -499,17 +499,12 @@ void AGridGenerator::CreateSecondGrid()
 	for(int i = 0; i < BaseGridQuads.Num(); i++)
 	{
 		bool IsEdge = false;
-		int EdgePoints = 0;
 		for(int j = 0; j < BaseGridQuads[i].Points.Num(); j++)
 		{
 			if(BaseGridPoints[BaseGridQuads[i].Points[j]].IsEdge)
 			{
-				EdgePoints++;
-				if(EdgePoints >= 2)
-				{
-					IsEdge = true;
-					break;
-				}
+				IsEdge = true;
+				break;
 			}
 		}
 		BuildingGridPoints.Emplace(i, BaseGridQuads[i].Center, IsEdge);
@@ -539,36 +534,37 @@ void AGridGenerator::CreateSecondGrid()
 		//Put shape points and neighbours in same order
 		TArray<int> ShapePoints;
 		for(int j = 0; j < BaseGridPoints[BuildingGridShapes[i].CorrespondingBaseGridPoint].Neighbours.Num(); j++)
+		{
+			//if(!BaseGridPoints[BaseGridPoints[BuildingGridShapes[i].CorrespondingBaseGridPoint].Neighbours[j]].IsEdge)
 			ShapePoints.Add(BaseGridPoints[BuildingGridShapes[i].CorrespondingBaseGridPoint].Neighbours[j]);
+		}
 		FGridShape Shape(-1, ShapePoints, -1);
 		SortShapePoints(Shape, false);
-		TArray<int> AllNeighbourArray;
+		//TArray<int> AllNeighbourArray;
 		TArray<int> NewNeighbourArray;
 		for(int j = 0; j < Shape.Points.Num(); j++)
 		{
-			if(!BaseGridPoints[Shape.Points[j]].IsEdge)
-			{
+			//if(!BaseGridPoints[Shape.Points[j]].IsEdge)
 				NewNeighbourArray.Add(BaseGridPoints[Shape.Points[j]].CorrespondingBuildingShape);
-				AllNeighbourArray.Add(BaseGridPoints[Shape.Points[j]].CorrespondingBuildingShape);
-			}
-			else
-			{
-				AllNeighbourArray.Add(-1);
-			}
+			//if(BaseGridPoints[Shape.Points[j]].IsEdge)
+			//AllNeighbourArray.Add(BaseGridPoints[Shape.Points[j]].CorrespondingBuildingShape);
 		}
-		BuildingGridShapes[i].Neighbours = NewNeighbourArray;
-		BuildingGridShapes[i].OffsetNeighbours = AllNeighbourArray;
 
 		const FVector Point1 = BuildingGridPoints[BuildingGridShapes[i].Points[0]].Location - BuildingGridShapes[i].Center;
 		float LeastAngle = -999999999999999.f;
 		int Neighbour1 = -1;
-		int OffsetNeighbour1 = 0;
-		for(int j = 0; j < BuildingGridShapes[i].Neighbours.Num(); j++)
+		for(int j = 0; j < NewNeighbourArray.Num(); j++)
 		{
-			const int NeighbourIndex = BuildingGridShapes[i].Neighbours[j];
+			const int NeighbourIndex = NewNeighbourArray[j];
+
+			if(NeighbourIndex == -1)
+			{
+				continue;
+			}
+			
 			const FVector CenterNeighbour = BuildingGridShapes[NeighbourIndex].Center - BuildingGridShapes[i].Center;
-			const float Dot = UE::Geometry::Dot(Point1, CenterNeighbour);
-			const FVector Cross = UE::Geometry::Cross(Point1, CenterNeighbour);
+			const float Dot = UE::Geometry::Dot(Point1.GetSafeNormal(), CenterNeighbour.GetSafeNormal());
+			const FVector Cross = UE::Geometry::Cross(Point1.GetSafeNormal(), CenterNeighbour.GetSafeNormal());
 
 			float Angle = FMath::Atan2(Cross.Z, Dot);
 			if(Angle < 0.f)
@@ -580,26 +576,32 @@ void AGridGenerator::CreateSecondGrid()
 				Neighbour1 = j;
 			}
 		}
+		//NewNeighbourArray.Empty();
+		//AllNeighbourArray.Empty();
 
-		for(int j = 0; j <= Neighbour1 && j < BuildingGridShapes[i].OffsetNeighbours.Num(); j++)
-		{
-			if(BuildingGridShapes[i].OffsetNeighbours[j] == BuildingGridShapes[i].Neighbours[Neighbour1])
-			{
-				OffsetNeighbour1 = j - Neighbour1;
-				break;
-			}
-		}
-
-		NewNeighbourArray.Empty();
-		AllNeighbourArray.Empty();
+		BuildingGridShapes[i].Neighbours.Empty();
+		BuildingGridShapes[i].OffsetNeighbours.Empty();
 		for(int j = Neighbour1; j < Shape.Points.Num() + Neighbour1; j++)
 		{
-			if(BuildingGridShapes[i].OffsetNeighbours[j % Shape.Points.Num()] != -1)
-				NewNeighbourArray.Add(BaseGridPoints[Shape.Points[(j + OffsetNeighbour1) % Shape.Points.Num()]].CorrespondingBuildingShape);
-			AllNeighbourArray.Add(BaseGridPoints[Shape.Points[j % Shape.Points.Num()]].CorrespondingBuildingShape);
+			const int PointIndex = Shape.Points[j % Shape.Points.Num()];
+			if(PointIndex == -1)
+				continue;
+			const int NeighbourIndex = BaseGridPoints[PointIndex].CorrespondingBuildingShape;
+			if(NeighbourIndex == -1)
+				continue;
+			BuildingGridShapes[i].Neighbours.Add(NeighbourIndex);
+			BuildingGridShapes[i].OffsetNeighbours.Add(NeighbourIndex);
 		}
-		BuildingGridShapes[i].Neighbours = NewNeighbourArray;
-		BuildingGridShapes[i].OffsetNeighbours = AllNeighbourArray;
+
+		for(int j = 0; j < BuildingGridShapes[i].Points.Num(); j++)
+		{
+			if(BuildingGridPoints[BuildingGridShapes[i].Points[j]].IsEdge && BuildingGridPoints[BuildingGridShapes[i].Points[(j + 1) % BuildingGridShapes[i].Points.Num()]].IsEdge)
+			{
+				BuildingGridShapes[i].OffsetNeighbours.Insert(-1, j);
+			}
+		}
+		//BuildingGridShapes[i].Neighbours = NewNeighbourArray;
+		//BuildingGridShapes[i].OffsetNeighbours = AllNeighbourArray;
 		
 		//Create the composing quads
 		for(int j = 0; j < BuildingGridShapes[i].Points.Num(); j++)
@@ -623,11 +625,23 @@ void AGridGenerator::CreateSecondGrid()
 			{
 				Quad.Add(BuildingGridPoints[BuildingGridShapes[i].Points[j]].Location);
 				const FVector CurrentShapeLoc = BaseGridPoints[BuildingGridShapes[i].CorrespondingBaseGridPoint].Location;
-				const FVector NextNeighbourLoc = BaseGridPoints[ShapePoints[j]].Location;
-				int PrevNeighbourIndex = j - 1;
+				int PrevInvalidNeighbours = 0;
+				int Index = 0;
+				while(Index <= j && BuildingGridShapes[i].OffsetNeighbours[Index] == -1)
+				{
+					PrevInvalidNeighbours++;
+					Index++;
+				}
+				int NextNeighbourIndex = (j + Neighbour1 - PrevInvalidNeighbours) % Shape.Points.Num();
+				if(NextNeighbourIndex < 0)
+					NextNeighbourIndex += Shape.Points.Num();
+				const FVector NextNeighbourLoc = BaseGridPoints[Shape.Points[NextNeighbourIndex]].Location;
+				int PrevNeighbourIndex = j - 1 + Neighbour1 - PrevInvalidNeighbours;
 				if(PrevNeighbourIndex < 0)
-					PrevNeighbourIndex += ShapePoints.Num();
-				const FVector PrevNeighbourLoc = BaseGridPoints[ShapePoints[PrevNeighbourIndex]].Location;
+					PrevNeighbourIndex += Shape.Points.Num();
+				else
+					PrevNeighbourIndex %= Shape.Points.Num();
+				const FVector PrevNeighbourLoc = BaseGridPoints[Shape.Points[PrevNeighbourIndex]].Location;
 				Quad.Add((CurrentShapeLoc + PrevNeighbourLoc) / 2.f);
 				Quad.Add(CurrentShapeLoc);
 				Quad.Add((CurrentShapeLoc + NextNeighbourLoc) / 2.f);
