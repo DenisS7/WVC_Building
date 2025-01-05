@@ -46,6 +46,7 @@ bool UtilityLibrary::GetGridAndBuildingMouseIsHoveringOver(const UWorld* World, 
 	{
 		HitBuildingIndex = -1;
 		HitBuildingIndex = Grid->DetermineWhichGridShapeAPointIsIn(HitResult.Location);
+		HitBuildingElevation = 0;
 		if(HitBuildingIndex != -1)
 			return true;
 	}
@@ -76,7 +77,7 @@ bool UtilityLibrary::GetGridAndBuildingMouseIsHoveringOver(const UWorld* World, 
 			if(HitResult.Location.Z > static_cast<float>(AdjacentHitBuildingElevation) * 200.f + 2.f * MeshBounds.GetBox().GetExtent().Z - 10.f)
 			{
 				++AdjacentHitBuildingElevation;
-				if(AdjacentHitBuildingElevation > 15)
+				if(AdjacentHitBuildingElevation >= Grid->GetMaxElevation())
 					return false;
 				AdjacentHitBuildingIndex = BaseShapeIndex;
 				return true;

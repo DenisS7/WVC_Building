@@ -61,15 +61,37 @@ void APlayerCamera::SetupPlayerInputComponent(UInputComponent* PlayerInputCompon
 void APlayerCamera::OnLeftMouseButtonPressed()
 {
 	AGridGenerator* Grid = nullptr;
-	int Shape = -1;
-	UtilityLibrary::GetGridAndShapeMouseIsHoveringOver(GetWorld(), Grid, Shape);
+	int HitBuildingIndex = -1;
+	int HitBuildingElevation = -1;
+	int AdjacentBuildingIndex = -1;
+	int AdjacentBuildingElevation = -1;
+	const bool Hit = UtilityLibrary::GetGridAndBuildingMouseIsHoveringOver(GetWorld(), Grid, HitBuildingIndex, HitBuildingElevation, AdjacentBuildingIndex, AdjacentBuildingElevation);
 
-	if(!Grid || Shape < 0)
+	if(!Hit || !Grid)
 	{
 		return;
 	}
 
-	const FGridShape& GridShape = Grid->GetBuildingGridShapes()[Shape];
+	int MarchingBit = -1;
+	int MarchingBitElevation = -1;
+
+	if(HitBuildingIndex != -1)
+	{
+		if(AdjacentBuildingIndex != -1)
+		{
+			MarchingBit = AdjacentBuildingIndex;
+			MarchingBitElevation = AdjacentBuildingElevation;
+		}
+		else
+		{
+			MarchingBit = HitBuildingIndex;
+			MarchingBitElevation = HitBuildingElevation;
+		}
+	}
+		
+
+	const FGridShape& GridShape = Grid->GetBuildingGridShapes()[MarchingBit];
+	//Elevation will be changed
 	Grid->UpdateMarchingBit(0, GridShape.CorrespondingBaseGridPoint, true);//MarchingBits[0][GridShape.CorrespondingGrid1Point] = true;
 	
 	//WVC Step to determine the pool
@@ -88,7 +110,7 @@ void APlayerCamera::OnRightMouseButtonPressed()
 	int HitBuildingElevation = -1;
 	int AdjacentBuildingIndex = -1;
 	int AdjacentBuildingElevation = -1;
-	bool Hit = UtilityLibrary::GetGridAndBuildingMouseIsHoveringOver(GetWorld(), Grid, HitBuildingIndex, HitBuildingElevation, AdjacentBuildingIndex, AdjacentBuildingElevation);
+	const bool Hit = UtilityLibrary::GetGridAndBuildingMouseIsHoveringOver(GetWorld(), Grid, HitBuildingIndex, HitBuildingElevation, AdjacentBuildingIndex, AdjacentBuildingElevation);
 
 	if(!Hit || !Grid || HitBuildingIndex < 0)
 	{
@@ -96,7 +118,7 @@ void APlayerCamera::OnRightMouseButtonPressed()
 	}
 	
 	const FGridShape& GridShape = Grid->GetBuildingGridShapes()[HitBuildingIndex];
-	Grid->UpdateMarchingBit(0, GridShape.CorrespondingBaseGridPoint, false);
+	Grid->UpdateMarchingBit(HitBuildingElevation, GridShape.CorrespondingBaseGridPoint, false);
 }
 
 void APlayerCamera::OnRightMouseButtonReleased()

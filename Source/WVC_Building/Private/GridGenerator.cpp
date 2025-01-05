@@ -44,8 +44,9 @@ void AGridGenerator::BeginPlay()
 {
 	Super::BeginPlay();
 
-	Elevations.Add(FElevationData(BaseGridPoints.Num()));
-	Elevations.Add(FElevationData(BaseGridPoints.Num()));
+	for(int i = 0; i < MaxElevation; i++)
+		Elevations.Add(FElevationData(BaseGridPoints.Num()));
+	//Elevations.Add(FElevationData(BaseGridPoints.Num()));
 }
 
 void AGridGenerator::OnConstruction(const FTransform& Transform)
@@ -87,39 +88,49 @@ void AGridGenerator::GenerateGrid()
 	ReorderQuadNeighbours();
 
 	TArray<FColor> Colors = {FColor::Red, FColor::Green, FColor::Blue, FColor::Yellow, FColor::Purple, FColor::Emerald, FColor::Magenta};
-	for(int i = 0; i < BaseGridQuads.Num(); i++)
+	for(int i = 0; i < BuildingGridShapes.Num(); i++)
 	{
-		//DrawDebugBox(GetWorld(), BaseGridQuads[i].Center, FVector(8.f), FColor::Black, true, -1, 0, 5.f);
-		//for(int j = 0; j < 4; j++)
-		//{
-		for(int j = 0; j < 1; j++)
+		for(int j = 0; j < BuildingGridShapes[i].ComposingQuads.Num() && j < 1; j++)
 		{
-			//DrawDebugSphere(GetWorld(), BaseGridPoints[BaseGridQuads[i].Points[j]].Location, 10.f + j * 3.f, 3, Colors[j], true, -1, 0, 3.f); 
-			if(BaseGridQuads[i].OffsetNeighbours[j] != -1)
+			for(int k = 0; k < BuildingGridShapes[i].ComposingQuads[j].Points.Num(); k++)
 			{
-				const FVector Direction = (BaseGridQuads[BaseGridQuads[i].OffsetNeighbours[j]].Center - BaseGridQuads[i].Center).GetSafeNormal();
-				//DrawDebugLine(GetWorld(), BaseGridQuads[i].Center, BaseGridQuads[BaseGridQuads[i].OffsetNeighbours[j]].Center - Direction * 50.f, Colors[j], true, -1, 0, 5.f);
+				DrawDebugLine(GetWorld(), BuildingGridShapes[i].ComposingQuads[j].Points[k], BuildingGridShapes[i].ComposingQuads[j].Points[(k + 1) % 4], FColor::Purple, true, -1, 0, 3.f);
 			}
 		}
-
-		const FGridQuad& Quad = BaseGridQuads[i];
-		for(int j = 0; j < Quad.Points.Num(); j++)
-		{
-			FVector Pos = (GetBasePointCoordinates(Quad.Points[j]) + GetBasePointCoordinates(Quad.Points[(j + 1) % Quad.Points.Num()])) / 2.f;
-		FVector Pos2 = (GetBasePointCoordinates(Quad.Points[(j + 1) % Quad.Points.Num()]) + GetBasePointCoordinates(Quad.Points[(j + 2) % Quad.Points.Num()])) / 2.f;
-			Pos.Z = Pos2.Z = 0.f;
-			DrawDebugLine(GetWorld(), Pos, Pos2, Colors[j], true, -1, 0, 3.f);
-			//DrawDebugString(GetWorld(), Pos - Quad.Center, FString::FromInt(EdgeCodes[i + 1]), this, FColor::Black, 1.f);
-		}
-
 	}
-
-	UE_LOG(LogTemp, Warning, TEXT("\n\n"));
-	for(int i = 0; i < BaseGridQuads[0].Points.Num(); i++)
-	{
-		UE_LOG(LogTemp, Warning, TEXT("Point: %d  ----- Neighbour: %d"), BaseGridQuads[0].Points[i], BaseGridQuads[0].OffsetNeighbours[i]);
-	}
-	UE_LOG(LogTemp, Warning, TEXT("\n\n"));
+	//for(int i = 0; i < BaseGridQuads.Num(); i++)
+	//{
+	//	//DrawDebugBox(GetWorld(), BaseGridQuads[i].Center, FVector(8.f), FColor::Black, true, -1, 0, 5.f);
+	//	//for(int j = 0; j < 4; j++)
+	//	//{
+	//	for(int j = 0; j < 1; j++)
+	//	{
+	//		//DrawDebugSphere(GetWorld(), BaseGridPoints[BaseGridQuads[i].Points[j]].Location, 10.f + j * 3.f, 3, Colors[j], true, -1, 0, 3.f); 
+	//		if(BaseGridQuads[i].OffsetNeighbours[j] != -1)
+	//		{
+	//			const FVector Direction = (BaseGridQuads[BaseGridQuads[i].OffsetNeighbours[j]].Center - BaseGridQuads[i].Center).GetSafeNormal();
+	//			//DrawDebugLine(GetWorld(), BaseGridQuads[i].Center, BaseGridQuads[BaseGridQuads[i].OffsetNeighbours[j]].Center - Direction * 50.f, Colors[j], true, -1, 0, 5.f);
+	//		}
+	//	}
+//
+	//	const FGridQuad& Quad = BaseGridQuads[i];
+	//	for(int j = 0; j < Quad.Points.Num(); j++)
+	//	{
+	//		FVector Pos = (GetBasePointCoordinates(Quad.Points[j]) + GetBasePointCoordinates(Quad.Points[(j + 1) % Quad.Points.Num()])) / 2.f;
+	//		FVector Pos2 = (GetBasePointCoordinates(Quad.Points[(j + 1) % Quad.Points.Num()]) + GetBasePointCoordinates(Quad.Points[(j + 2) % Quad.Points.Num()])) / 2.f;
+	//		Pos.Z = Pos2.Z = 0.f;
+	//		DrawDebugLine(GetWorld(), Pos, Pos2, Colors[j], true, -1, 0, 3.f);
+	//		//DrawDebugString(GetWorld(), Pos - Quad.Center, FString::FromInt(EdgeCodes[i + 1]), this, FColor::Black, 1.f);
+	//	}
+//
+	//}
+//
+	//UE_LOG(LogTemp, Warning, TEXT("\n\n"));
+	//for(int i = 0; i < BaseGridQuads[0].Points.Num(); i++)
+	//{
+	//	UE_LOG(LogTemp, Warning, TEXT("Point: %d  ----- Neighbour: %d"), BaseGridQuads[0].Points[i], BaseGridQuads[0].OffsetNeighbours[i]);
+	//}
+	//UE_LOG(LogTemp, Warning, TEXT("\n\n"));
 }
 
 void AGridGenerator::GenerateHexCoordinates(const FVector& GridCenter, const float HexSize, const uint32 HexIndex)
@@ -1320,7 +1331,8 @@ void AGridGenerator::UpdateBuildingPiece(const int& ElevationLevel, const int& I
 	for(int k = 0; k < 4; k++)
 		CageBase.Add(GetBasePointCoordinates(CorrespondingQuad.Points[k]));
 	const auto Find = Elevations[ElevationLevel].BuildingPieces.Find(Index);
-	ABuildingPiece* BuildingPiece;
+	TObjectPtr<ABuildingPiece> BuildingPiece;
+	
 	if(Find)
 	{
 		BuildingPiece = *Find;
@@ -1410,6 +1422,7 @@ void AGridGenerator::UpdateBuildingPiece(const int& ElevationLevel, const int& I
 	
 	const FName RowName(RowNameString);
 	const auto Row = BuildingPiece->DataTable->FindRow<FMeshCornersData>(RowName, "MeshCornersRow");
+	check(Row);
 	BuildingPiece->SetStaticMesh(Row->Mesh);
 	BuildingPiece->DeformMesh(CageBase, 200.f, Rotation);
 	UAllMeshData::GetInstance()->ProcessMeshData(GetWorld(), BuildingPiece->GetActorLocation(), Rotation, BuildingPiece->StaticMeshComponent->GetStaticMesh(), BuildingPiece->EdgeCodes);

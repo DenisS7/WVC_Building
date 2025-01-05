@@ -290,6 +290,8 @@ public:
 	static int GetNumberOfPointsOnHex(const uint32 Hex) { if(Hex == 0) return 1; return 6 * Hex; }
 	static int GetFirstPointIndexOnHex(const uint32 Hex) { if(Hex == 0) return 0; return Hex * (Hex - 1) / 2 * 6 + 1;}
 ;	static int GetIndexOfPointOnHex(const uint32 Hex, const uint32 Point) { if (Hex == 0) return 0; return GetFirstPointIndexOnHex(Hex) + Point; }
+
+	int GetMaxElevation() const { return MaxElevation; }
 	const FVector& GetBasePointCoordinates(const uint32 Point) const { return BaseGridPoints[Point].Location; }
 	const FVector& GetBuildingPointCoordinates(const uint32 Point) const { return BuildingGridPoints[Point].Location; }
 	const TArray<FGridPoint>& GetBaseGridPoints() const { return BaseGridPoints; }
@@ -373,6 +375,9 @@ protected:
 	FTimerDelegate CreateWholeGridMeshDelegate;
 	FTimerDelegate CreateSecondGridDelegate;
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	int MaxElevation = 10;
+	
 	UPROPERTY(BlueprintReadOnly)
 	TArray<FElevationData> Elevations;
 	

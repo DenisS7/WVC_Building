@@ -37,7 +37,7 @@ void ABuildingPiece::Tick(float DeltaTime)
 	//	return;
 	const FGridQuad& Quad = Grid->GetBaseGridQuads()[CorrespondingQuadIndex];
 				
-	for(int i = 0; i < Quad.Points.Num(); i++)
+	for(int i = 0; i < Quad.Points.Num() && (i + 1) < EdgeCodes.Num(); i++)
 	{
 		FVector Pos = (Grid->GetBasePointCoordinates(Quad.Points[i]) + Grid->GetBasePointCoordinates(Quad.Points[(i + 1) % Quad.Points.Num()])) / 2.f;
 		Pos.Z = 0.f;
