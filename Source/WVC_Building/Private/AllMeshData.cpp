@@ -175,7 +175,7 @@ bool UAllMeshData::ProcessMeshData(UWorld* World, const FVector& Center, const f
 		{
 			int Index = static_cast<int>(Side);
 			FVector SidePoint = PointCoord;
-			SidePoint *= Mult[Index];
+			//SidePoint *= Mult[Index];
 			const float X = FMath::RoundHalfFromZero(SidePoint.X * 100.f);
 			const float Y = FMath::RoundHalfFromZero(SidePoint.Y * 100.f);
 			const float Z = FMath::RoundHalfFromZero(SidePoint.Z * 100.f);
@@ -270,45 +270,62 @@ bool UAllMeshData::ProcessMeshData(UWorld* World, const FVector& Center, const f
 		else
 		{
 			EdgeCode.Add(MeshBordersVector[i], EdgeCode.Num() + 1);
-			TArray<FIntVector> FlippedVector = MeshBordersVector[i];
-			TArray<FIntVector> RotatedVector = MeshBordersVector[i];
-			TArray<FIntVector> FlippedRotatedVector = MeshBordersVector[i];
-			if(Side == EEdgeSide::Front || Side == EEdgeSide::Back)
-			{
-				for(int j = 0; j < FlippedVector.Num(); j++)
-				{
-					FlippedVector[j].X *= -1;
-				}
-				
-				for(int j = 0; j < RotatedVector.Num(); j++)
-				{
-					Swap(RotatedVector[j].X, RotatedVector[j].Y);
-					Swap(FlippedRotatedVector[j].X, FlippedRotatedVector[j].Y);
-					FlippedRotatedVector[j].Y *= -1;
-				}
-			}
-			else if(Side == EEdgeSide::Left || Side == EEdgeSide::Right)
-			{
-				for(int j = 0; j < FlippedVector.Num(); j++)
-				{
-					FlippedVector[j].Y *= -1;
-				}
-				
-				for(int j = 0; j < RotatedVector.Num(); j++)
-				{
-					Swap(RotatedVector[j].X, RotatedVector[j].Y);
-					Swap(FlippedRotatedVector[j].X, FlippedRotatedVector[j].Y);
-					FlippedRotatedVector[j].X *= -1;
-				}
-			}
-
-			FlippedVector.Sort(Comparator);
-			RotatedVector.Sort(Comparator);
-			FlippedRotatedVector.Sort(Comparator);
 			EdgeVariations.Add(MeshBordersVector[i], MeshBordersVector[i]);
-			EdgeVariations.Add(FlippedVector, MeshBordersVector[i]);
-			EdgeVariations.Add(RotatedVector, MeshBordersVector[i]);
-			EdgeVariations.Add(FlippedRotatedVector, MeshBordersVector[i]);
+			TArray<FIntVector> RotatedVector = MeshBordersVector[i];
+			for(int j = 0; j < 3; j++)
+			{
+				for(int k = 0; k < RotatedVector.Num(); k++)
+				{
+					Swap(RotatedVector[k].X, RotatedVector[k].Y);
+					RotatedVector[k].X *= -1;
+				}
+				RotatedVector.Sort(Comparator);
+				EdgeVariations.Add(RotatedVector, MeshBordersVector[i]);
+			}
+			TArray<FIntVector> FlippedVector = MeshBordersVector[i];
+			for(int j = 0; j < FlippedVector.Num(); j++)
+				Swap(FlippedVector[j].X, FlippedVector[j].Y);
+			FlippedVector.Sort(Comparator);
+			TArray<FIntVector>* FoundFlippedVector = EdgeVariations.Find(FlippedVector);
+			if(FoundFlippedVector)
+			{
+				UE_LOG(LogTemp, Display, TEXT("Mesh: %s - Flipped Edge code found: %d"), *StaticMesh->GetPathName(), EdgeCode[*FoundFlippedVector]);
+			}
+			else
+			{
+				EdgeCode.Add(FlippedVector, EdgeCode.Num() + 1);
+				UE_LOG(LogTemp, Warning, TEXT("Mesh: %s - Connection: %d <-> %d"), *StaticMesh->GetPathName(), EdgeCode[MeshBordersVector[i]], EdgeCode[FlippedVector]);
+				RotatedVector = FlippedVector;
+				for(int j = 0; j < 3; j++)
+				{
+					for(int k = 0; k < RotatedVector.Num(); k++)
+					{
+						Swap(RotatedVector[k].X, RotatedVector[k].Y);
+						RotatedVector[k].X *= -1;
+					}
+					RotatedVector.Sort(Comparator);
+					EdgeVariations.Add(RotatedVector, FlippedVector);
+				}
+			}
+			//if(Side == EEdgeSide::Front || Side == EEdgeSide::Back)
+			//{
+			//	
+			//	for(int j = 0; j < RotatedVector.Num(); j++)
+			//	{
+			//		Swap(RotatedVector[j].X, RotatedVector[j].Y);
+			//	}
+			//}
+			//else if(Side == EEdgeSide::Left || Side == EEdgeSide::Right)
+			//{
+			//	for(int j = 0; j < RotatedVector.Num(); j++)
+			//	{
+			//		Swap(RotatedVector[j].X, RotatedVector[j].Y);
+			//	}
+			//}
+			
+
+
+			//EdgeVariations.Add(RotatedVector, MeshBordersVector[i]);
 		}
 		EdgeCodes.Add(EdgeCode[EdgeVariations[MeshBordersVector[i]]]);
 	}

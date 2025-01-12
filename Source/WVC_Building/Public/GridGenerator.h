@@ -51,7 +51,7 @@ struct FGridQuad
 	int Index = -1;
 	
 	UPROPERTY(BlueprintReadOnly)
-	FVector Center;
+	FVector Center = FVector::ZeroVector;
 	
 	UPROPERTY(BlueprintReadOnly)
 	TArray<int> Points;
