@@ -294,6 +294,7 @@ bool UAllMeshData::ProcessMeshData(UWorld* World, const FVector& Center, const f
 			else
 			{
 				EdgeCode.Add(FlippedVector, EdgeCode.Num() + 1);
+				EdgeVariations.Add(FlippedVector, FlippedVector);
 				UE_LOG(LogTemp, Warning, TEXT("Mesh: %s - Connection: %d <-> %d"), *StaticMesh->GetPathName(), EdgeCode[MeshBordersVector[i]], EdgeCode[FlippedVector]);
 				RotatedVector = FlippedVector;
 				for(int j = 0; j < 3; j++)
