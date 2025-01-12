@@ -4,6 +4,7 @@
 #include "GridGenerator.h"
 
 #include "AllMeshData.h"
+#include "BuildingMeshData.h"
 #include "BuildingPiece.h"
 #include "DebugStrings.h"
 #include "GridGeneratorVis.h"
@@ -1425,19 +1426,67 @@ void AGridGenerator::UpdateBuildingPiece(const int& ElevationLevel, const int& I
 		World->DestroyActor(BuildingPiece);
 		return;
 	}
+
+	TArray<FName> Candidates;
+	TArray<int> AllCorners = LowerCorners;
+	AllCorners.Append(UpperCorners);
+
+	BuildingPiece->Corners = AllCorners;
+
+	TArray<FBuildingMeshData*> TableRows;
+	BuildingPiece->DataTable->GetAllRows(TEXT("UpdateBuildingPiece"), TableRows);
+	for(const FBuildingMeshData* Row : TableRows)
+	{
+		//Change to bitmasking
+		if(Row->Corners.Num() != BuildingPiece->Corners.Num())
+			continue;
+
+		bool Candidate = true;
+		for(int i = 0; i < BuildingPiece->Corners.Num(); i++)
+		{
+			bool Found = false;
+			for(int j = 0; j < Row->Corners.Num(); j++)
+			{
+				if(BuildingPiece->Corners[i] == Row->Corners[j])
+				{
+					Found = true;
+					break;
+				}
+			}
+			if(!Found)
+			{
+				Candidate = false;
+				break;
+			}
+		}
+
+		if(Candidate)
+			Candidates.Add(Row->Name);
+	}
+
+	FName ChosenMeshName;
+
+	check(Candidates.Num() > 0);
 	
-	FString RowNameString;
-	BuildingPiece->Corners = LowerCorners;
-	BuildingPiece->Corners.Append(UpperCorners);
-	for(int j = 0; j < LowerCorners.Num(); j++)
-		RowNameString.Append(FString::FromInt(LowerCorners[j]));
-	for(int j = 0; j < UpperCorners.Num(); j++)
-		RowNameString.Append(FString::FromInt(UpperCorners[j]));
+	ChosenMeshName = Candidates[0];
 	
-	const FName RowName(RowNameString);
-	const auto Row = BuildingPiece->DataTable->FindRow<FMeshCornersData>(RowName, "MeshCornersRow");
+	const auto Row = BuildingPiece->DataTable->FindRow<FBuildingMeshData>(ChosenMeshName, "MeshCornersRow");
 	check(Row);
-	BuildingPiece->SetStaticMesh(Row->Mesh);
+	BuildingPiece->SetStaticMesh(Row->StaticMesh);
 	BuildingPiece->DeformMesh(CageBase, 200.f, Rotation);
-	UAllMeshData::GetInstance()->ProcessMeshData(GetWorld(), BuildingPiece->GetActorLocation(), Rotation, BuildingPiece->StaticMeshComponent->GetStaticMesh(), BuildingPiece->EdgeCodes);
+
+	BuildingPiece->EdgeCodes.Empty();
+	BuildingPiece->EdgeCodes.SetNum(6);
+	int Cycle = (4 - (static_cast<int>((Rotation) / 90.f))) % 4;
+	for(int i = 1; i < 5; i++)
+	{
+		int NewIndex = i - Cycle;
+		if(NewIndex <= 0)
+			NewIndex += 4;
+		if(NewIndex >= 5)
+			NewIndex -= 4;
+		BuildingPiece->EdgeCodes[i] = Row->EdgeCodes[NewIndex];
+	}
+	BuildingPiece->EdgeCodes[0] = BuildingPiece->EdgeCodes[0];
+	BuildingPiece->EdgeCodes[5] = BuildingPiece->EdgeCodes[5];
 }
