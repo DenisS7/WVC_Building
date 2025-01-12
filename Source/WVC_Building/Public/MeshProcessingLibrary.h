@@ -25,14 +25,14 @@ class WVC_BUILDING_API UMeshProcessingLibrary : public UBlueprintFunctionLibrary
 	GENERATED_BODY()
 public:
 	UFUNCTION(BlueprintCallable, Category = "MeshDataSingleton")
-    static void ProcessAllMeshes(UDataTable* DataTable, const FString& FolderPath);
+    static void ProcessAllMeshes(UDataTable* MeshDataTable, UDataTable* EdgeAdjacencyTable, const FString& FolderPath);
    
     UFUNCTION(BlueprintCallable, Category = "MeshDataSingleton")
     static void GetMeshData(const FName& MeshName);
 
 private:
 
-	static bool ProcessMeshData(const UStaticMesh* StaticMesh, TArray<int>& EdgeCodesOut, TMap<TArray<FIntVector>, TArray<FIntVector>>& EdgeVariations, TMap<TArray<FIntVector>, int>& EdgeCodes, UWorld* World = nullptr, const FVector& Center = FVector::ZeroVector);
+	static bool ProcessMeshData(const UStaticMesh* StaticMesh, TArray<int>& EdgeCodesOut, TMap<TArray<FIntVector>, TArray<FIntVector>>& EdgeVariations, TMap<TArray<FIntVector>, int>& EdgeCodes, TMap<int, int>& EdgeAdjacencies, UWorld* World = nullptr, const FVector& Center = FVector::ZeroVector);
    
     UFUNCTION(BlueprintCallable, Category = "MeshDataSingleton")
     static void SaveMeshData();

@@ -4,13 +4,15 @@
 #include "MeshProcessingLibrary.h"
 // Fill out your copyright notice in the Description page of Project Settings.
 
+#include "EdgeAdjacencyData.h"
 #include "WVC_Building/Public/BuildingMeshData.h"
 #include "AssetRegistry/AssetRegistryModule.h"
 
-void UMeshProcessingLibrary::ProcessAllMeshes(UDataTable* DataTable, const FString& FolderPath)
+void UMeshProcessingLibrary::ProcessAllMeshes(UDataTable* MeshDataTable, UDataTable* EdgeAdjacencyTable, const FString& FolderPath)
 {
 	TMap<TArray<FIntVector>, TArray<FIntVector>> EdgeVariations;
 	TMap<TArray<FIntVector>, int> EdgeCodes;
+	TMap<int, int> EdgeAdjacencies;
 	
 	FAssetRegistryModule& AssetRegistryModule = FModuleManager::LoadModuleChecked<FAssetRegistryModule>("AssetRegistry");
 	
@@ -27,11 +29,11 @@ void UMeshProcessingLibrary::ProcessAllMeshes(UDataTable* DataTable, const FStri
 	{
 		UStaticMesh* StaticMesh = Cast<UStaticMesh>(AssetData.GetAsset());
 		TArray<int> MeshEdgeCodes;
-		if(ProcessMeshData(StaticMesh, MeshEdgeCodes, EdgeVariations, EdgeCodes))
+		if(ProcessMeshData(StaticMesh, MeshEdgeCodes, EdgeVariations, EdgeCodes, EdgeAdjacencies))
 		{
 			const FName MeshName = *StaticMesh->GetName();
 			MeshNames.Add(MeshName);
-			FBuildingMeshData* MeshRow = DataTable->FindRow<FBuildingMeshData>(MeshName, TEXT("ProcessAllMeshes"));
+			FBuildingMeshData* MeshRow = MeshDataTable->FindRow<FBuildingMeshData>(MeshName, TEXT("ProcessAllMeshes"));
 			if(MeshRow)
 			{
 				MeshRow->EdgeCodes = MeshEdgeCodes;
@@ -43,18 +45,27 @@ void UMeshProcessingLibrary::ProcessAllMeshes(UDataTable* DataTable, const FStri
 				MeshData.Name = MeshName;
 				MeshData.EdgeCodes = MeshEdgeCodes;
 				MeshData.StaticMesh = StaticMesh;
-				DataTable->AddRow(MeshName, MeshData);
+				MeshDataTable->AddRow(MeshName, MeshData);
 			}
 		}
 	}
 
+	EdgeAdjacencyTable->EmptyTable();
+	for(auto EdgeAdjacency : EdgeAdjacencies)
+	{
+		FEdgeAdjacencyData EdgeAdjacencyData;
+		EdgeAdjacencyData.EdgeCode = EdgeAdjacency.Key;
+		EdgeAdjacencyData.CorrespondingEdgeCode = EdgeAdjacency.Value;
+		EdgeAdjacencyTable->AddRow(FName(*FString::FromInt(EdgeAdjacency.Key)), EdgeAdjacencyData);
+	}
+
 	TArray<FBuildingMeshData*> TableRows;
-	DataTable->GetAllRows<FBuildingMeshData>(TEXT("ProcessAllMeshes"), TableRows);
+	MeshDataTable->GetAllRows<FBuildingMeshData>(TEXT("ProcessAllMeshes"), TableRows);
 	
 	for(const FBuildingMeshData* Row : TableRows)
 	{
 		if(!MeshNames.Contains(Row->Name))
-			DataTable->RemoveRow(Row->Name);		
+			MeshDataTable->RemoveRow(Row->Name);		
 	}
 }
 
@@ -62,7 +73,7 @@ void UMeshProcessingLibrary::GetMeshData(const FName& MeshName)
 {
 }
 
-bool UMeshProcessingLibrary::ProcessMeshData(const UStaticMesh* StaticMesh, TArray<int>& EdgeCodesOut, TMap<TArray<FIntVector>, TArray<FIntVector>>& EdgeVariations, TMap<TArray<FIntVector>, int>& EdgeCodes, UWorld* World, const FVector& Center)
+bool UMeshProcessingLibrary::ProcessMeshData(const UStaticMesh* StaticMesh, TArray<int>& EdgeCodesOut, TMap<TArray<FIntVector>, TArray<FIntVector>>& EdgeVariations, TMap<TArray<FIntVector>, int>& EdgeCodes, TMap<int, int>& EdgeAdjacencies, UWorld* World, const FVector& Center)
 {
 	if (!StaticMesh)
 	{
@@ -289,20 +300,38 @@ bool UMeshProcessingLibrary::ProcessMeshData(const UStaticMesh* StaticMesh, TArr
 				RotatedVector.Sort(Comparator);
 				EdgeVariations.Add(RotatedVector, MeshBordersVector[i]);
 			}
+
 			TArray<FIntVector> FlippedVector = MeshBordersVector[i];
-			for(int j = 0; j < FlippedVector.Num(); j++)
-				Swap(FlippedVector[j].X, FlippedVector[j].Y);
+			if(Side == EEdgeSide::Bottom)
+			{
+				for(int j = 0; j < FlippedVector.Num(); j++)
+					FlippedVector[j].Z = 2000;
+			}
+			else if (Side == EEdgeSide::Top)
+			{
+				for(int j = 0; j < FlippedVector.Num(); j++)
+					FlippedVector[j].Z = 0;
+			}
+			else
+			{
+				for(int j = 0; j < FlippedVector.Num(); j++)
+					Swap(FlippedVector[j].X, FlippedVector[j].Y);
+			}
 			FlippedVector.Sort(Comparator);
 			TArray<FIntVector>* FoundFlippedVector = EdgeVariations.Find(FlippedVector);
 			if(FoundFlippedVector)
 			{
 				UE_LOG(LogTemp, Display, TEXT("Mesh: %s - Flipped Edge code found: %d"), *StaticMesh->GetPathName(), EdgeCodes[*FoundFlippedVector]);
+				EdgeAdjacencies.Add(EdgeCodes[MeshBordersVector[i]], EdgeCodes[EdgeVariations[FlippedVector]]);
+
 			}
 			else
 			{
 				EdgeCodes.Add(FlippedVector, EdgeCodes.Num() + 1);
 				EdgeVariations.Add(FlippedVector, FlippedVector);
 				UE_LOG(LogTemp, Warning, TEXT("Mesh: %s - Connection: %d <-> %d"), *StaticMesh->GetPathName(), EdgeCodes[MeshBordersVector[i]], EdgeCodes[FlippedVector]);
+				EdgeAdjacencies.Add(EdgeCodes[MeshBordersVector[i]], EdgeCodes[FlippedVector]);
+				EdgeAdjacencies.Add(EdgeCodes[FlippedVector], EdgeCodes[MeshBordersVector[i]]);
 				RotatedVector = FlippedVector;
 				for(int j = 0; j < 3; j++)
 				{
