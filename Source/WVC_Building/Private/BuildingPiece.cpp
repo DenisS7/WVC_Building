@@ -44,7 +44,7 @@ void ABuildingPiece::Tick(float DeltaTime)
 		FVector Direction = (Quad.Center - Pos).GetSafeNormal();
 		Pos += Direction * 30.f; 
 		Pos.Z = 200.f;
-		DrawDebugString(GetWorld(), Pos - Quad.Center, FString::FromInt(EdgeCodes[i + 1]), this, FColor::Black, 1.f);
+		//DrawDebugString(GetWorld(), Pos - Quad.Center, FString::FromInt(EdgeCodes[i + 1]), this, FColor::Black, 1.f);
 	}
 }
 

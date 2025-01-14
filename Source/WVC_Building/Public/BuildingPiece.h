@@ -47,6 +47,7 @@ public:
 	float GetRotation() const { return MeshRotation; }
 	const TArray<int>& GetEdgeCodes() const { return EdgeCodes; }
 	const UProceduralMeshComponent* GetProceduralMeshComponent() const { return ProceduralMeshComponent; }
+
 protected:
 	friend AGridGenerator;
 	// Called when the game starts or when spawned
