@@ -11,7 +11,7 @@ struct WVC_BUILDING_API FBuildingMeshData : public FTableRowBase
 	FName Name;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "BuildingMeshData")
-	UStaticMesh* StaticMesh;
+	UStaticMesh* StaticMesh = nullptr;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "BuildingMeshData")
 	TArray<int> Corners;

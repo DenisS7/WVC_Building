@@ -94,6 +94,7 @@ bool UMeshProcessingLibrary::ProcessMeshData(const UStaticMesh* StaticMesh, TArr
 	const FRawStaticIndexBuffer& Index2Buffer = LODResource.AdditionalIndexBuffers->WireframeIndexBuffer;
 	TMap<FIntPoint, int> Edges;
 	TMap<int, int> CorrectVertex;
+	TArray<int> UniqueVertices;
 
 	//Duplicate vertex
 	for(int i = 0; i < IndexBuffer.GetNumIndices(); i++)
@@ -111,13 +112,67 @@ bool UMeshProcessingLibrary::ProcessMeshData(const UStaticMesh* StaticMesh, TArr
 			{
 				CorrectVertex.FindOrAdd(Index2, Index);
 				CorrectVertex.FindOrAdd(Index, Index);
+				UniqueVertices.AddUnique(Index);
 				Found = true;
 			}
 		}
 		if(!Found)
+		{
 			CorrectVertex.FindOrAdd(Index, Index);
+			UniqueVertices.AddUnique(Index);
+		}
 	}
 
+	TArray<TArray<int>> Triangles;
+
+	//Go through Correct Vertices
+		//Determine what side they are on (if any)
+	//Go through triangles
+		//Check if the vertices have a side in common
+		//Check if the vertices is on at least 2 sides
+			//Yes? add them to a Vector that would exclude them from being borders on that side
+
+	const float PieceExtent = 100.f - 1.f;
+	TMap<int, TArray<EEdgeSide>> UniqueVerticesSides;
+
+	for(int i = 0; i < UniqueVertices.Num(); i++)
+	{
+		const FVector PointCoord = static_cast<FVector>(VertexBuffer.VertexPosition(UniqueVertices[i]));
+
+		TArray<EEdgeSide> Sides;
+		//Forward
+		if(PointCoord.Y > PieceExtent)
+		{
+			Sides.Add(EEdgeSide::Front);
+		}
+		else if(PointCoord.Y < -PieceExtent)
+		{
+			Sides.Add(EEdgeSide::Back);
+		}
+
+		//Sides
+		if(PointCoord.X < -PieceExtent)
+		{
+			Sides.Add(EEdgeSide::Right);
+		}
+		else if(PointCoord.X > PieceExtent)
+		{
+			Sides.Add(EEdgeSide::Left);
+		}
+
+		//Vertical
+		if(PointCoord.Z > 2.f * PieceExtent + 1.f)
+		{
+			Sides.Add(EEdgeSide::Top);
+		}
+		else if(PointCoord.Z < 1.f)
+		{
+			Sides.Add(EEdgeSide::Bottom);
+		}
+
+		UniqueVerticesSides.Add(UniqueVertices[i], Sides);
+	}
+	
 	//Edge face count
 	for (int i = 0; i < IndexBuffer.GetNumIndices(); i += 3)
 	{
@@ -128,6 +183,8 @@ bool UMeshProcessingLibrary::ProcessMeshData(const UStaticMesh* StaticMesh, TArr
 		const int Index0 = CorrectVertex[OGIndex0];
 		const int Index1 = CorrectVertex[OGIndex1];
 		const int Index2 = CorrectVertex[OGIndex2];
+
+		Triangles.Add(TArray<int>({Index0, Index1, Index2}));
 		
 		FIntPoint Edge1 = FIntPoint(FMath::Min(Index0, Index1), FMath::Max(Index0, Index1));
 		FIntPoint Edge2 = FIntPoint(FMath::Min(Index1, Index2), FMath::Max(Index1, Index2));
@@ -138,6 +195,48 @@ bool UMeshProcessingLibrary::ProcessMeshData(const UStaticMesh* StaticMesh, TArr
 		Edges.FindOrAdd(Edge3)++;
 	}
 
+	//Go through triangles
+		//Check if the vertices have a side in common
+		//Check if the vertices is on at least 2 sides
+			//Yes? add them to a Vector that would exclude them from being borders on that side
+
+	TArray<TArray<int>> SideExcludeVertices;
+	SideExcludeVertices.SetNum(6);
+	for(int i = 0; i < Triangles.Num(); i++)
+	{
+		EEdgeSide CommonSide = EEdgeSide::Bottom;
+		bool HaveCommonSide = false;
+		
+		TArray<EEdgeSide> Point0Sides = UniqueVerticesSides[Triangles[i][0]];
+		TArray<EEdgeSide> Point1Sides = UniqueVerticesSides[Triangles[i][1]];
+		TArray<EEdgeSide> Point2Sides = UniqueVerticesSides[Triangles[i][2]];
+		for(int j = 0; j < Point0Sides.Num(); j++)
+		{
+			if(Point1Sides.Contains(Point0Sides[j]) && Point2Sides.Contains(Point0Sides[j]))
+			{
+				CommonSide = Point0Sides[j];
+				HaveCommonSide = true;
+				break;
+			}
+		}
+
+		if(HaveCommonSide)
+		{
+			if(Point0Sides.Num() >= 2)
+			{
+				SideExcludeVertices[static_cast<int>(CommonSide)].Add(Triangles[i][0]);
+			}
+			if(Point1Sides.Num() >= 2)
+			{
+				SideExcludeVertices[static_cast<int>(CommonSide)].Add(Triangles[i][1]);
+			}
+			if(Point2Sides.Num() >= 2)
+			{
+				SideExcludeVertices[static_cast<int>(CommonSide)].Add(Triangles[i][2]);
+			}
+		}
+	}
+	
 	//Border points
 	TArray<int> EdgePoints;
 	for(const auto& Edge : Edges)
@@ -149,7 +248,7 @@ bool UMeshProcessingLibrary::ProcessMeshData(const UStaticMesh* StaticMesh, TArr
 		}
 	}
 	
-	const float PieceExtent = 100.f - 1.f;
+	
 
 	TArray<TArray<int>> MeshBorders;
 	TArray<TArray<FIntVector>> MeshBordersVector;
@@ -194,6 +293,8 @@ bool UMeshProcessingLibrary::ProcessMeshData(const UStaticMesh* StaticMesh, TArr
 
 		for(const EEdgeSide& Side : Sides)
 		{
+			if(SideExcludeVertices[static_cast<int>(Side)].Contains(EdgePoints[i]))
+				continue;
 			int Index = static_cast<int>(Side);
 			FVector SidePoint = PointCoord;
 			const float X = FMath::RoundHalfFromZero(SidePoint.X * 100.f);
@@ -244,11 +345,12 @@ bool UMeshProcessingLibrary::ProcessMeshData(const UStaticMesh* StaticMesh, TArr
 			}
 		}
 	}
-
+	
 	//Remove extra points
 	for(int i = 0; i < ExtraPoints.Num(); i++)
 	{
-		for(int j = 0; j < ExtraPoints[i].Num(); j++)
+		ExtraPoints[i].Sort();
+		for(int j = ExtraPoints[i].Num() - 1; j >= 0; j--)
 		{
 			MeshBorders[i].RemoveAt(ExtraPoints[i][j]);
 			MeshBordersVector[i].RemoveAt(ExtraPoints[i][j]);
