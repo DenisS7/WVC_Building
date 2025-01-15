@@ -32,6 +32,100 @@ AGridGenerator::AGridGenerator()
 	CreateSecondGridDelegate = FTimerDelegate::CreateUObject(this, &AGridGenerator::CreateSecondGrid);
 }
 
+void AGridGenerator::RunWVC(const int Elevation, const int MarchingBitUpdated)
+{
+	//Elevation/Point
+	struct FCell
+	{
+		int Elevation = -1;
+		int Index = -1;
+
+		FCell(const int InElevation, const int InIndex)
+			: Elevation(InElevation), Index(InIndex)
+		{}
+
+		bool operator==(const FCell& Other) const
+		{
+			return Elevation == Other.Elevation && Index == Other.Index;
+		}
+	};
+	TArray<FCell> BuildingCells;
+
+	//Add initial cells (the ones the marching bit updated is part of)
+	TArray<FCell> CellsToCheck;
+	for(int i = 0; i < BaseGridPoints[MarchingBitUpdated].PartOfQuads.Num(); i++)
+		CellsToCheck.Emplace(Elevation, BaseGridPoints[MarchingBitUpdated].PartOfQuads[i]);
+	
+	TArray<FCell> CheckedCells;
+	
+	while(CellsToCheck.Num())
+	{
+		//Get first cell and remove it from check array
+		const FCell CurrentCell = CellsToCheck[0];
+		CellsToCheck.RemoveAt(0);
+		CheckedCells.Add(CurrentCell);
+		
+		//Check cell neighbours
+		const TArray<int> CurrentCellsPoints = BaseGridQuads[CurrentCell.Index].Points;
+		
+		//should always be 4, but just in case
+		for(int i = 0; i < CurrentCellsPoints.Num(); i++)
+		{
+			//Add neighbours containing that point (if they're valid)
+			if(Elevations[CurrentCell.Elevation].MarchingBits[CurrentCellsPoints[i]])
+			{
+				BuildingCells.AddUnique(CurrentCell);
+				const int PreviousNeighbourIndex = i - 1 < 0 ? CurrentCellsPoints.Num() - 1 : i - 1;
+				const int NextNeighbourIndex = i;
+
+				const int PreviousNeighbour = BaseGridQuads[CurrentCell.Index].OffsetNeighbours[PreviousNeighbourIndex];
+				const int NextNeighbour = BaseGridQuads[CurrentCell.Index].OffsetNeighbours[NextNeighbourIndex];
+				if(PreviousNeighbour != -1)
+				{
+					const FCell PreviousNeighbourCell(CurrentCell.Elevation, PreviousNeighbour);
+					if(!CheckedCells.Contains(PreviousNeighbourCell))
+					{
+						CellsToCheck.AddUnique(PreviousNeighbourCell);
+					}
+				}
+
+				if(NextNeighbour != -1)
+				{
+					const FCell NextNeighbourCell(CurrentCell.Elevation, NextNeighbour);
+					if(!CheckedCells.Contains(NextNeighbourCell))
+					{
+						CellsToCheck.AddUnique(NextNeighbourCell);
+					}
+				}
+			}
+		}
+
+		//Add above and bellow cells
+		const int BelowElevation = CurrentCell.Elevation - 1;
+		const int AboveElevation = CurrentCell.Elevation + 1;
+		
+		if(BelowElevation > 0 && BelowElevation < MaxElevation)
+		{
+			const FCell BelowCell(BelowElevation, CurrentCell.Index); 
+			if(!CheckedCells.Contains(BelowCell))
+				CellsToCheck.AddUnique(BelowCell);
+		}
+
+		if(AboveElevation > 0 && AboveElevation < MaxElevation)
+		{
+			const FCell AboveCell(AboveElevation, CurrentCell.Index);
+			if(!CheckedCells.Contains(AboveCell))
+				CellsToCheck.AddUnique(AboveCell);
+		}
+	}
+
+	for(int i = 0; i < BuildingCells.Num(); i++)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("Cell: %d, %d"), BuildingCells[i].Elevation, BuildingCells[i].Index);
+	}
+	UE_LOG(LogTemp, Warning, TEXT("----------------------\n"));
+}
+
 UWorld* AGridGenerator::GetGridWorld() const
 {
 	return GetWorld();
@@ -1326,6 +1420,7 @@ void AGridGenerator::DrawSecondGrid()
 void AGridGenerator::UpdateMarchingBit(const int& ElevationLevel, const int& Index, const bool& Value)
 {
 	Elevations[ElevationLevel].MarchingBits[Index] = Value;
+	RunWVC(ElevationLevel, Index);
 	for(int i = 0; i < BaseGridPoints[Index].PartOfQuads.Num(); i++)
 	{
 		UpdateBuildingPiece(ElevationLevel, BaseGridPoints[Index].PartOfQuads[i]);

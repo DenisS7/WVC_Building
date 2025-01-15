@@ -300,6 +300,8 @@ public:
 	const TArray<FGridShape>& GetBuildingGridShapes() const { return BuildingGridShapes; }
 	const FElevationData& GetElevationData(const int& Level) const { return Elevations[Level]; }
 
+	void RunWVC(const int Elevation, const int MarchingBitUpdated);
+	
 	UFUNCTION(BlueprintCallable, Category = "GridGenerator")
 	UWorld* GetGridWorld() const;
 protected:
