@@ -1159,7 +1159,6 @@ TArray<FCell*> AGridGenerator::GetCellsToCheck(const int Elevation, const int Ma
 		FCell* CurrentCell = CellsToCheck[0];
 		CellsToCheck.RemoveAt(0);
 		CheckedCells.Add(CurrentCell);
-		
 		//Check cell neighbours
 		const TArray<int> CurrentCellsPoints = BaseGridQuads[CurrentCell->Index].Points;
 		
@@ -1197,21 +1196,49 @@ TArray<FCell*> AGridGenerator::GetCellsToCheck(const int Elevation, const int Ma
 		}
 
 		//Add above and bellow cells
-		const int BelowElevation = CurrentCell->Elevation - 1;
+		const int Bellow = CurrentCell->Elevation - 1;
 		const int AboveElevation = CurrentCell->Elevation + 1;
-		
-		if(BelowElevation > 0 && BelowElevation < MaxElevation)
+		// might break if there are upper marching bits and no lower ones
+		if(Bellow > 0 && Bellow < MaxElevation - 1)
 		{
-			FCell* BelowCell = &Elevations[BelowElevation].Cells[CurrentCell->Index]; 
-			if(!CheckedCells.Contains(BelowCell))
-				CellsToCheck.AddUnique(BelowCell);
+			FCell* BelowCell = &Elevations[Bellow].Cells[CurrentCell->Index];
+			for(int i = 0; i < CurrentCellsPoints.Num(); i++)
+			{
+				if(Elevations[CurrentCell->Elevation].MarchingBits[CurrentCellsPoints[i]])
+				{
+					if(!CheckedCells.Contains(BelowCell))
+						CellsToCheck.AddUnique(BelowCell);
+					break;
+				}
+			}
 		}
 
-		if(AboveElevation > 0 && AboveElevation < MaxElevation)
+		if(AboveElevation > 0 && AboveElevation < MaxElevation - 1)
 		{
 			FCell* AboveCell = &Elevations[AboveElevation].Cells[CurrentCell->Index];
-			if(!CheckedCells.Contains(AboveCell))
-				CellsToCheck.AddUnique(AboveCell);
+			for(int i = 0; i < CurrentCellsPoints.Num(); i++)
+			{
+				if(Elevations[AboveElevation].MarchingBits[CurrentCellsPoints[i]])
+				{
+					if(!CheckedCells.Contains(AboveCell))
+						CellsToCheck.AddUnique(AboveCell);
+					break;
+				}
+			}
+		}
+	}
+
+	for(int i = 0; i < CheckedCells.Num(); i++)
+	{
+		GetMarchingBitsForCell(*CheckedCells[i]);
+		if(!CheckedCells[i]->MarchingBits.Num())
+		{
+			TObjectPtr<ABuildingPiece>* BuildingPiece = Elevations[CheckedCells[i]->Elevation].BuildingPieces.Find(CheckedCells[i]->Index);
+			if(BuildingPiece)
+			{
+				Elevations[CheckedCells[i]->Elevation].BuildingPieces.Remove(CheckedCells[i]->Index);
+				GetWorld()->DestroyActor(*BuildingPiece);
+			}
 		}
 	}
 
@@ -1231,7 +1258,6 @@ void AGridGenerator::CalculateCandidates(TArray<FCell*>& Cells)
 	MeshTable->GetAllRows(TEXT("CalculateSuperposition"), TableRows);
 	for(int i = 0; i < Cells.Num(); i++)
 	{
-		GetMarchingBitsForCell(*Cells[i]);
 		for(int j = 0; j < TableRows.Num(); j++)
 		{
 			//Sanity check
@@ -1481,7 +1507,9 @@ void AGridGenerator::CreateCellMeshes(const TArray<FCell*>& Cells)
 			check(Row);
 			BuildingPiece->SetStaticMesh(Row->StaticMesh);
 			BuildingPiece->DeformMesh(CageBase, 200.f, Cells[i]->RotationAmount * 90.f);
-			BuildingPiece->AddActorWorldOffset(FVector(0.f, 0.f, 200.f * static_cast<float>(Cells[i]->Elevation)));
+			FVector BuildingPieceLocation = BuildingPiece->GetActorLocation();
+			BuildingPieceLocation.Z = 200.f * static_cast<float>(Cells[i]->Elevation);
+			BuildingPiece->SetActorLocation(BuildingPieceLocation);
 		}
 	}
 }
@@ -1867,8 +1895,8 @@ void AGridGenerator::UpdateMarchingBit(const int& ElevationLevel, const int& Ind
 	int ActualElevationLevel = ElevationLevel;
 	if(ElevationLevel < MaxElevation - 1)
 	{
-		if(Elevations[ElevationLevel].MarchingBits[Index] == false && ElevationLevel > 0)
-			ActualElevationLevel--;
+		//if(Elevations[ElevationLevel].MarchingBits[Index] == false && ElevationLevel > 0)
+		//	ActualElevationLevel--;
 		Elevations[ActualElevationLevel + 1].MarchingBits[Index] = Value;
 	}
 	Elevations[ActualElevationLevel].MarchingBits[Index] = Value;

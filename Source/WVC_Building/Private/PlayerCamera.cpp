@@ -191,6 +191,8 @@ void APlayerCamera::HoverOverShape()
 			CommonPoints.Insert(CommonPoints[0] * 0.5f + CommonPoints[1] * 0.5f, 1);
 			for(int i = CommonPoints.Num() - 1; i >= 0; i--)
 				CommonPoints.Add(CommonPoints[i] + FVector(0.f, 0.f, 200.f));
+			for(int i = 0; i < CommonPoints.Num(); i++)
+				CommonPoints[i].Z += static_cast<float>(Elevation) * 200.f;
 		}
 		Grid->CreateAdjacentShapeMesh(CommonPoints);
 		//UE_LOG(LogTemp, Warning, TEXT("Current: %d,   Adjacent: %d,    Elevation: %d"), Shape, AdjacentShape, Elevation);
