@@ -183,8 +183,10 @@ struct FCell
 	TArray<TArray<int>> DiscardedCandidateBorders;
 	
 	int RotationAmount = 0;
-	bool ChosenMesh = false;
+	bool HasChosenCandidate = false;
 
+	FName ChosenCandidate = FName("");
+	
 	TArray<TPair<int, int>> Neighbours;
 	
 	TArray<int> MarchingBits;
@@ -378,7 +380,7 @@ protected:
 	TArray<FCell*> GetCellsToCheck(const int Elevation, const int MarchingBitUpdated);
 	void CalculateCandidates(TArray<FCell*>& Cells);
 	void PropagateChoice(TArray<FCell>& Cells, const FCell& UpdatedCell);
-	void SolveWVC(TArray<FCell*>& OriginalCells, TArray<FCell>& CopyCells, TArray<int> CellOrder = TArray<int>());
+	bool SolveWVC(TArray<FCell*>& OriginalCells, TArray<FCell>& CopyCells, TArray<int> CellOrder = TArray<int>());
 	void CreateCellMeshes(const TArray<FCell*>& Cells);
 	
 	

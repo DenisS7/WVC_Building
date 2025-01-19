@@ -47,6 +47,7 @@ void AGridGenerator::RunWVC(const int Elevation, const int MarchingBitUpdated)
 	}
 
 	SolveWVC(BuildingCells, CopyBuildingCells);
+	CreateCellMeshes(BuildingCells);
 }
 
 UWorld* AGridGenerator::GetGridWorld() const
@@ -1169,7 +1170,7 @@ TArray<FCell*> AGridGenerator::GetCellsToCheck(const int Elevation, const int Ma
 			if(Elevations[CurrentCell->Elevation].MarchingBits[CurrentCellsPoints[i]])
 			{
 				BuildingCells.AddUnique(CurrentCell);
-				BuildingCells.Last()->ChosenMesh = false;
+				BuildingCells.Last()->HasChosenCandidate = false;
 				const int PreviousNeighbourIndex = i - 1 < 0 ? CurrentCellsPoints.Num() - 1 : i - 1;
 				const int NextNeighbourIndex = i;
 
@@ -1256,20 +1257,6 @@ void AGridGenerator::CalculateCandidates(TArray<FCell*>& Cells)
 				}
 				
 				Cells[i]->CandidateBorders.Add(MeshBorders);
-				
-				FGridQuad& Quad = BaseGridQuads[Cells[i]->Index];
-				if(Cells[i]->CandidateBorders.Num() == 1 && Cells[i]->Elevation == 0)
-				{
-					for(int k = 0; k < Quad.Points.Num() && (k + 1) < Cells[i]->CandidateBorders[0].Num(); k++)
-					{
-						FVector Pos = (GetBasePointCoordinates(Quad.Points[k]) + GetBasePointCoordinates(Quad.Points[(k + 1) % Quad.Points.Num()])) / 2.f;
-						Pos.Z = 0.f;
-						FVector Direction = (Quad.Center - Pos).GetSafeNormal();
-						Pos += Direction * 30.f; 
-						Pos.Z = 200.f;
-						DrawDebugString(GetWorld(), Pos, FString::FromInt(Cells[i]->CandidateBorders[0][k + 1]), this, FColor::Black, 15.f);
-					}
-				}
 			}
 		}
 	}
@@ -1311,8 +1298,14 @@ void AGridGenerator::PropagateChoice(TArray<FCell>& Cells, const FCell& UpdatedC
 		}
 		else
 		{
-			const int UpdatedCellIndex = Neighbour.Neighbours.Find(TPair<int, int>(UpdatedCell.Elevation, UpdatedCell.Index));
-			if(CheckNeighbourCandidates(UpdatedCell, Neighbour, i, UpdatedCellIndex))
+			int NeighbourToCellBorderIndex = Neighbour.Neighbours.Find(TPair<int, int>(UpdatedCell.Elevation, UpdatedCell.Index));
+			int CellToNeighbourBorderIndex = i;
+			if(Neighbour.Neighbours[0].Key == UpdatedCell.Elevation)
+				NeighbourToCellBorderIndex++;
+			if(UpdatedCell.Neighbours[0].Key == UpdatedCell.Elevation)
+				CellToNeighbourBorderIndex++;
+			
+			if(CheckNeighbourCandidates(UpdatedCell, Neighbour, CellToNeighbourBorderIndex, NeighbourToCellBorderIndex))
 			{
 				CellsToPropagate.Add(&Neighbour);
 			}
@@ -1325,25 +1318,27 @@ void AGridGenerator::PropagateChoice(TArray<FCell>& Cells, const FCell& UpdatedC
 	}
 }
 
-void AGridGenerator::SolveWVC(TArray<FCell*>& OriginalCells, TArray<FCell>& CopyCells, TArray<int> CellOrder)
+bool AGridGenerator::SolveWVC(TArray<FCell*>& OriginalCells, TArray<FCell>& CopyCells, TArray<int> CellOrder)
 {
-	while(int LowestEntropy = GetLowestEntropyCell(CopyCells) != -1)
+	int LowestEntropy = GetLowestEntropyCell(CopyCells);
+	while(LowestEntropy != -1)
     {
     	CellOrder.Add(LowestEntropy);
-    	int CandidateChosen = FMath::RandRange(0, CopyCells[LowestEntropy].Candidates.Num() - 1);
-    	const FName CandidateName = CopyCells[LowestEntropy].Candidates[CandidateChosen];
+		int CandidateChosen = FMath::RandRange(0, CopyCells[LowestEntropy].Candidates.Num() - 1);
+    	CopyCells[LowestEntropy].ChosenCandidate = CopyCells[LowestEntropy].Candidates[CandidateChosen];
     	const TArray<int> CandidateBorders = CopyCells[LowestEntropy].CandidateBorders[CandidateChosen];
 
 		CopyCells[LowestEntropy].DiscardedCandidates.Append(CopyCells[LowestEntropy].Candidates);
 		CopyCells[LowestEntropy].DiscardedCandidateBorders.Append(CopyCells[LowestEntropy].CandidateBorders);
 
-		const int RemoveIndex = CopyCells[LowestEntropy].DiscardedCandidates.Find(CandidateName);
+		const int RemoveIndex = CopyCells[LowestEntropy].DiscardedCandidates.Find(CopyCells[LowestEntropy].ChosenCandidate);
 		CopyCells[LowestEntropy].DiscardedCandidates.RemoveAt(RemoveIndex);
 		CopyCells[LowestEntropy].DiscardedCandidateBorders.RemoveAt(RemoveIndex);
 		
-    	CopyCells[LowestEntropy].Candidates = TArray<FName>({CandidateName});
+    	CopyCells[LowestEntropy].Candidates = TArray<FName>({CopyCells[LowestEntropy].ChosenCandidate});
     	CopyCells[LowestEntropy].CandidateBorders = TArray<TArray<int>>({CandidateBorders});
     	PropagateChoice(CopyCells, CopyCells[LowestEntropy]);
+		LowestEntropy = GetLowestEntropyCell(CopyCells);
     	//CopyBuildingCells[LowestEntropy]->ChosenMesh = true;
     }
 
@@ -1359,10 +1354,11 @@ void AGridGenerator::SolveWVC(TArray<FCell*>& OriginalCells, TArray<FCell>& Copy
     				if(j == 0)
     				{
     					UE_LOG(LogTemp, Error, TEXT("CAN'T FIND SOLUTION"));
-    					break;
+    					return false;
     				}
 				    else 
 				    {
+				    	//Go back to previous decision and remove that option since it lead to a non solution
 						OriginalCells[CellOrder[j]]->Candidates.Append(OriginalCells[CellOrder[j]]->DiscardedCandidates);
 						OriginalCells[CellOrder[j]]->CandidateBorders.Append(OriginalCells[CellOrder[j]]->DiscardedCandidateBorders);
 
@@ -1375,12 +1371,13 @@ void AGridGenerator::SolveWVC(TArray<FCell*>& OriginalCells, TArray<FCell>& Copy
 				    	CopyCells[CellOrder[j]].DiscardedCandidates.Empty();
 				    	CopyCells[CellOrder[j]].DiscardedCandidateBorders.Empty();
 				    	CellOrder.Pop();
-				    	j--;
+				    	//j--;
+				    	//Retry = true;
 				    }
     			}
     			else
     			{
-    				const int IndexToRemove = OriginalCells[CellOrder[j]]->Candidates.Find(CopyCells[CellOrder[j]].Candidates[0]);
+    				const int IndexToRemove = OriginalCells[CellOrder[j]]->Candidates.Find(CopyCells[CellOrder[j]].ChosenCandidate);
     				OriginalCells[CellOrder[j]]->DiscardedCandidates.Add(OriginalCells[CellOrder[j]]->Candidates[IndexToRemove]);
     				OriginalCells[CellOrder[j]]->DiscardedCandidateBorders.Add(OriginalCells[CellOrder[j]]->CandidateBorders[IndexToRemove]);
     				
@@ -1390,9 +1387,32 @@ void AGridGenerator::SolveWVC(TArray<FCell*>& OriginalCells, TArray<FCell>& Copy
     				CopyCells[CellOrder[j]].Candidates = OriginalCells[CellOrder[j]]->Candidates;
     				CopyCells[CellOrder[j]].CandidateBorders = OriginalCells[CellOrder[j]]->CandidateBorders;
 
-    				CopyCells[CellOrder[j]].DiscardedCandidates.Empty();
-    				CopyCells[CellOrder[j]].DiscardedCandidateBorders.Empty();
+    				CopyCells[CellOrder[j]].DiscardedCandidates = OriginalCells[CellOrder[j]]->DiscardedCandidates;
+    				CopyCells[CellOrder[j]].DiscardedCandidateBorders = OriginalCells[CellOrder[j]]->DiscardedCandidateBorders;
     				Retry = true;
+
+    				for(int k = 0; k < CopyCells.Num(); k++)
+    				{
+    					if(CellOrder.Contains(k) && k != CellOrder[j])
+    					{
+    						int Index = OriginalCells[k]->Candidates.Find(CopyCells[k].ChosenCandidate);
+    						check(Index != INDEX_NONE)
+
+    						CopyCells[k].Candidates = TArray<FName>({OriginalCells[k]->Candidates[Index]});
+    						CopyCells[k].CandidateBorders = TArray<TArray<int>>({OriginalCells[k]->CandidateBorders[Index]});
+
+    						
+    						continue;
+    					}
+    					CopyCells[k].Candidates = OriginalCells[k]->Candidates;
+    					CopyCells[k].CandidateBorders = OriginalCells[k]->CandidateBorders;
+
+    					CopyCells[k].DiscardedCandidates.Empty();
+    					CopyCells[k].DiscardedCandidateBorders.Empty();
+    				}
+    				CellOrder.Pop();
+    				
+    				break;
     			}
     		}
     		break;
@@ -1401,8 +1421,32 @@ void AGridGenerator::SolveWVC(TArray<FCell*>& OriginalCells, TArray<FCell>& Copy
 
 	if(Retry)
 	{
-		SolveWVC(OriginalCells, CopyCells, CellOrder);
+		return SolveWVC(OriginalCells, CopyCells, CellOrder);
 	}
+	for(int i = 0; i < OriginalCells.Num(); i++)
+	{
+		OriginalCells[i]->Candidates = CopyCells[i].Candidates;
+		OriginalCells[i]->CandidateBorders = CopyCells[i].CandidateBorders;
+	}
+
+	for(int i = 0; i < CopyCells.Num(); i++)
+	{
+		FGridQuad& Quad = BaseGridQuads[CopyCells[i].Index];
+		if(CopyCells[i].CandidateBorders.Num() == 1 && CopyCells[i].Elevation == 0)
+		{
+			for(int k = 0; k < Quad.Points.Num() && (k + 1) < CopyCells[i].CandidateBorders[0].Num(); k++)
+			{
+				FVector Pos = (GetBasePointCoordinates(Quad.Points[k]) + GetBasePointCoordinates(Quad.Points[(k + 1) % Quad.Points.Num()])) / 2.f;
+				Pos.Z = 0.f;
+				FVector Direction = (Quad.Center - Pos).GetSafeNormal();
+				Pos += Direction * 30.f; 
+				Pos.Z = 200.f;
+				DrawDebugString(GetWorld(), Pos, FString::FromInt(CopyCells[i].CandidateBorders[0][k + 1]), this, FColor::Black, 20.f);
+			}
+		}
+	}
+	
+	return true;
 }
 
 void AGridGenerator::CreateCellMeshes(const TArray<FCell*>& Cells)
@@ -1427,7 +1471,7 @@ void AGridGenerator::CreateCellMeshes(const TArray<FCell*>& Cells)
 				BuildingPiece->Grid = this;
 				BuildingPiece->Elevation = Cells[i]->Elevation;
 				Elevations[Cells[i]->Elevation].BuildingPieces.Add(Cells[i]->Index, BuildingPiece);
-				//DrawDebugBox(GetWorld(), BaseGridPoints[CorrespondingQuad.Points[0]].Location + FVector(0.f, 0.f, 160.f), FVector(5.f), FColor::Red, false, 10, 0, 2.f);
+				DrawDebugBox(GetWorld(), BaseGridPoints[CorrespondingQuad.Points[0]].Location + FVector(0.f, 0.f, 160.f), FVector(5.f), FColor::Red, false, 10, 0, 2.f);
 			}
 			TArray<FVector> CageBase;
 			for(int k = 0; k < 4; k++)
@@ -1437,6 +1481,7 @@ void AGridGenerator::CreateCellMeshes(const TArray<FCell*>& Cells)
 			check(Row);
 			BuildingPiece->SetStaticMesh(Row->StaticMesh);
 			BuildingPiece->DeformMesh(CageBase, 200.f, Cells[i]->RotationAmount * 90.f);
+			BuildingPiece->AddActorWorldOffset(FVector(0.f, 0.f, 200.f * static_cast<float>(Cells[i]->Elevation)));
 		}
 	}
 }
@@ -1445,11 +1490,11 @@ int AGridGenerator::GetLowestEntropyCell(const TArray<FCell>& Cells)
 {
 	if(!Cells.Num())
 		return -1;
-	int LowestEntropyIndex = 0;
-	int LowestEntropy = Cells[0].Candidates.Num();
-	for(int i = 1; i < Cells.Num(); i++)
+	int LowestEntropyIndex = -1;
+	int LowestEntropy = 9999999;
+	for(int i = 0; i < Cells.Num(); i++)
 	{
-		if(Cells[i].Candidates.Num() < LowestEntropy)
+		if(1 < Cells[i].Candidates.Num() && Cells[i].Candidates.Num() < LowestEntropy)
 		{
 			LowestEntropy = Cells[i].Candidates.Num();
 			LowestEntropyIndex = i;
@@ -1464,6 +1509,7 @@ bool AGridGenerator::CheckNeighbourCandidates(const FCell& Cell, FCell& Neighbou
 	const int NeighbourCellBorderIndex)
 {
 	bool Changed = false;
+	TArray<int> RemainingCandidates;
 	for(int i = 0; i < Cell.Candidates.Num(); i++)
 	{
 		const FEdgeAdjacencyData* AdjacencyRow = BorderAdjacencyTable->FindRow<FEdgeAdjacencyData>(FName(FString::FromInt(Cell.CandidateBorders[i][CellBorderIndex])), TEXT("Propagate Choice"));
@@ -1472,16 +1518,23 @@ bool AGridGenerator::CheckNeighbourCandidates(const FCell& Cell, FCell& Neighbou
 		const int AdjacencyRequired = AdjacencyRow->CorrespondingEdgeCode;
 		for(int j = 0; j < NeighbourCell.Candidates.Num(); j++)
 		{
-			if(NeighbourCell.CandidateBorders[j][NeighbourCellBorderIndex] != AdjacencyRequired)
+			if(NeighbourCell.CandidateBorders[j][NeighbourCellBorderIndex] == AdjacencyRequired)
 			{
-				NeighbourCell.DiscardedCandidates.Add(NeighbourCell.Candidates[j]);
-				NeighbourCell.DiscardedCandidateBorders.Add(NeighbourCell.CandidateBorders[j]);
-				
-				NeighbourCell.Candidates.RemoveAt(j);
-				NeighbourCell.CandidateBorders.RemoveAt(j);
-				j--;
-				Changed = true;
+				RemainingCandidates.AddUnique(j);
 			}
+		}
+	}
+	
+	for(int i = NeighbourCell.Candidates.Num() - 1; i >= 0; i--)
+	{
+		if(!RemainingCandidates.Contains(i))
+		{
+			NeighbourCell.DiscardedCandidateBorders.Add(NeighbourCell.CandidateBorders[i]);
+			NeighbourCell.DiscardedCandidates.Add(NeighbourCell.Candidates[i]);
+
+			NeighbourCell.Candidates.RemoveAt(i);
+			NeighbourCell.CandidateBorders.RemoveAt(i);
+			Changed = true;
 		}
 	}
 
@@ -1822,7 +1875,7 @@ void AGridGenerator::UpdateMarchingBit(const int& ElevationLevel, const int& Ind
 	RunWVC(ActualElevationLevel, Index);
 	for(int i = 0; i < BaseGridPoints[Index].PartOfQuads.Num(); i++)
 	{
-		UpdateBuildingPiece(ActualElevationLevel, BaseGridPoints[Index].PartOfQuads[i]);
+		//UpdateBuildingPiece(ActualElevationLevel, BaseGridPoints[Index].PartOfQuads[i]);
 	}
 }
 
