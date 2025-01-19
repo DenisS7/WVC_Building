@@ -6,6 +6,7 @@
 #include "BuildingMeshData.h"
 #include "BuildingPiece.h"
 #include "DebugStrings.h"
+#include "EdgeAdjacencyData.h"
 #include "GridGeneratorVis.h"
 #include "Polygon2.h"
 #include "Components/DynamicMeshComponent.h"
@@ -34,96 +35,18 @@ AGridGenerator::AGridGenerator()
 
 void AGridGenerator::RunWVC(const int Elevation, const int MarchingBitUpdated)
 {
-	//Elevation/Point
-	struct FCell
-	{
-		int Elevation = -1;
-		int Index = -1;
-
-		FCell(const int InElevation, const int InIndex)
-			: Elevation(InElevation), Index(InIndex)
-		{}
-
-		bool operator==(const FCell& Other) const
-		{
-			return Elevation == Other.Elevation && Index == Other.Index;
-		}
-	};
-	TArray<FCell> BuildingCells;
-
-	//Add initial cells (the ones the marching bit updated is part of)
-	TArray<FCell> CellsToCheck;
-	for(int i = 0; i < BaseGridPoints[MarchingBitUpdated].PartOfQuads.Num(); i++)
-		CellsToCheck.Emplace(Elevation, BaseGridPoints[MarchingBitUpdated].PartOfQuads[i]);
-	
-	TArray<FCell> CheckedCells;
-	
-	while(CellsToCheck.Num())
-	{
-		//Get first cell and remove it from check array
-		const FCell CurrentCell = CellsToCheck[0];
-		CellsToCheck.RemoveAt(0);
-		CheckedCells.Add(CurrentCell);
-		
-		//Check cell neighbours
-		const TArray<int> CurrentCellsPoints = BaseGridQuads[CurrentCell.Index].Points;
-		
-		//should always be 4, but just in case
-		for(int i = 0; i < CurrentCellsPoints.Num(); i++)
-		{
-			//Add neighbours containing that point (if they're valid)
-			if(Elevations[CurrentCell.Elevation].MarchingBits[CurrentCellsPoints[i]])
-			{
-				BuildingCells.AddUnique(CurrentCell);
-				const int PreviousNeighbourIndex = i - 1 < 0 ? CurrentCellsPoints.Num() - 1 : i - 1;
-				const int NextNeighbourIndex = i;
-
-				const int PreviousNeighbour = BaseGridQuads[CurrentCell.Index].OffsetNeighbours[PreviousNeighbourIndex];
-				const int NextNeighbour = BaseGridQuads[CurrentCell.Index].OffsetNeighbours[NextNeighbourIndex];
-				if(PreviousNeighbour != -1)
-				{
-					const FCell PreviousNeighbourCell(CurrentCell.Elevation, PreviousNeighbour);
-					if(!CheckedCells.Contains(PreviousNeighbourCell))
-					{
-						CellsToCheck.AddUnique(PreviousNeighbourCell);
-					}
-				}
-
-				if(NextNeighbour != -1)
-				{
-					const FCell NextNeighbourCell(CurrentCell.Elevation, NextNeighbour);
-					if(!CheckedCells.Contains(NextNeighbourCell))
-					{
-						CellsToCheck.AddUnique(NextNeighbourCell);
-					}
-				}
-			}
-		}
-
-		//Add above and bellow cells
-		const int BelowElevation = CurrentCell.Elevation - 1;
-		const int AboveElevation = CurrentCell.Elevation + 1;
-		
-		if(BelowElevation > 0 && BelowElevation < MaxElevation)
-		{
-			const FCell BelowCell(BelowElevation, CurrentCell.Index); 
-			if(!CheckedCells.Contains(BelowCell))
-				CellsToCheck.AddUnique(BelowCell);
-		}
-
-		if(AboveElevation > 0 && AboveElevation < MaxElevation)
-		{
-			const FCell AboveCell(AboveElevation, CurrentCell.Index);
-			if(!CheckedCells.Contains(AboveCell))
-				CellsToCheck.AddUnique(AboveCell);
-		}
-	}
-
+	TArray<FCell*> BuildingCells = GetCellsToCheck(Elevation, MarchingBitUpdated);
+	CalculateCandidates(BuildingCells);
+	LogSuperpositionOptions(BuildingCells);
+	TArray<int> CellOrder;
+	bool FoundSolution = false;
+	TArray<FCell> CopyBuildingCells;
 	for(int i = 0; i < BuildingCells.Num(); i++)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("Cell: %d, %d"), BuildingCells[i].Elevation, BuildingCells[i].Index);
+		CopyBuildingCells.Add(*BuildingCells[i]);
 	}
-	UE_LOG(LogTemp, Warning, TEXT("----------------------\n"));
+
+	SolveWVC(BuildingCells, CopyBuildingCells);
 }
 
 UWorld* AGridGenerator::GetGridWorld() const
@@ -137,7 +60,19 @@ void AGridGenerator::BeginPlay()
 	Super::BeginPlay();
 
 	for(int i = 0; i < MaxElevation; i++)
+	{
 		Elevations.Add(FElevationData(BaseGridPoints.Num()));
+		for(int j = 0; j < BaseGridQuads.Num(); j++)
+		{
+			Elevations.Last().Cells.Add(BaseGridQuads[j].Index, FCell(i, BaseGridQuads[j].Index));
+			if(i >= 1)
+				Elevations.Last().Cells[BaseGridQuads[j].Index].Neighbours.Add(TPair<int, int>(i - 1, BaseGridQuads[j].Index));
+			for(int k = 0; k < BaseGridQuads[j].Neighbours.Num(); k++)
+				Elevations.Last().Cells[BaseGridQuads[j].Index].Neighbours.Add(TPair<int, int>(i, BaseGridQuads[j].Neighbours[k]));
+			if(i < MaxElevation - 1)
+				Elevations.Last().Cells[BaseGridQuads[j].Index].Neighbours.Add(TPair<int, int>(i + 1, BaseGridQuads[j].Index));
+		}
+	}
 	//Elevations.Add(FElevationData(BaseGridPoints.Num()));
 }
 
@@ -186,36 +121,36 @@ void AGridGenerator::GenerateGrid()
 		{
 			for(int k = 0; k < BuildingGridShapes[i].ComposingQuads[j].Points.Num(); k++)
 			{
-				DrawDebugLine(GetWorld(), BuildingGridShapes[i].ComposingQuads[j].Points[k], BuildingGridShapes[i].ComposingQuads[j].Points[(k + 1) % 4], FColor::Purple, true, -1, 0, 3.f);
+				//DrawDebugLine(GetWorld(), BuildingGridShapes[i].ComposingQuads[j].Points[k], BuildingGridShapes[i].ComposingQuads[j].Points[(k + 1) % 4], FColor::Purple, true, -1, 0, 3.f);
 			}
 		}
 	}
-	//for(int i = 0; i < BaseGridQuads.Num(); i++)
-	//{
-	//	//DrawDebugBox(GetWorld(), BaseGridQuads[i].Center, FVector(8.f), FColor::Black, true, -1, 0, 5.f);
-	//	//for(int j = 0; j < 4; j++)
-	//	//{
-	//	for(int j = 0; j < 1; j++)
-	//	{
-	//		//DrawDebugSphere(GetWorld(), BaseGridPoints[BaseGridQuads[i].Points[j]].Location, 10.f + j * 3.f, 3, Colors[j], true, -1, 0, 3.f); 
-	//		if(BaseGridQuads[i].OffsetNeighbours[j] != -1)
-	//		{
-	//			const FVector Direction = (BaseGridQuads[BaseGridQuads[i].OffsetNeighbours[j]].Center - BaseGridQuads[i].Center).GetSafeNormal();
-	//			//DrawDebugLine(GetWorld(), BaseGridQuads[i].Center, BaseGridQuads[BaseGridQuads[i].OffsetNeighbours[j]].Center - Direction * 50.f, Colors[j], true, -1, 0, 5.f);
-	//		}
-	//	}
-//
-	//	const FGridQuad& Quad = BaseGridQuads[i];
-	//	for(int j = 0; j < Quad.Points.Num(); j++)
-	//	{
-	//		FVector Pos = (GetBasePointCoordinates(Quad.Points[j]) + GetBasePointCoordinates(Quad.Points[(j + 1) % Quad.Points.Num()])) / 2.f;
-	//		FVector Pos2 = (GetBasePointCoordinates(Quad.Points[(j + 1) % Quad.Points.Num()]) + GetBasePointCoordinates(Quad.Points[(j + 2) % Quad.Points.Num()])) / 2.f;
-	//		Pos.Z = Pos2.Z = 0.f;
-	//		DrawDebugLine(GetWorld(), Pos, Pos2, Colors[j], true, -1, 0, 3.f);
-	//		//DrawDebugString(GetWorld(), Pos - Quad.Center, FString::FromInt(EdgeCodes[i + 1]), this, FColor::Black, 1.f);
-	//	}
-//
-	//}
+	
+	for(int i = 0; i < BaseGridQuads.Num(); i++)
+	{
+		//DrawDebugBox(GetWorld(), BaseGridQuads[i].Center, FVector(8.f), FColor::Black, true, -1, 0, 5.f);
+		//for(int j = 0; j < 4; j++)
+		//{
+		for(int j = 0; j < 4; j++)
+		{
+			//DrawDebugSphere(GetWorld(), BaseGridPoints[BaseGridQuads[i].Points[j]].Location, 10.f + j * 3.f, 3, Colors[j], true, -1, 0, 3.f); 
+			if(BaseGridQuads[i].OffsetNeighbours[j] != -1)
+			{
+				const FVector Direction = (BaseGridQuads[BaseGridQuads[i].OffsetNeighbours[j]].Center - BaseGridQuads[i].Center).GetSafeNormal();
+				DrawDebugLine(GetWorld(), BaseGridQuads[i].Center, BaseGridQuads[BaseGridQuads[i].OffsetNeighbours[j]].Center - Direction * 100.f, Colors[j], true, -1, 0, 5.f);
+			}
+		}
+
+		const FGridQuad& Quad = BaseGridQuads[i];
+		for(int j = 0; j < Quad.Points.Num(); j++)
+		{
+			FVector Pos = (GetBasePointCoordinates(Quad.Points[j]) + GetBasePointCoordinates(Quad.Points[(j + 1) % Quad.Points.Num()])) / 2.f;
+			FVector Pos2 = (GetBasePointCoordinates(Quad.Points[(j + 1) % Quad.Points.Num()]) + GetBasePointCoordinates(Quad.Points[(j + 2) % Quad.Points.Num()])) / 2.f;
+			Pos.Z = Pos2.Z = 0.f;
+			//DrawDebugLine(GetWorld(), Pos, Pos2, Colors[j], true, -1, 0, 3.f);
+			//DrawDebugString(GetWorld(), Pos - Quad.Center, FString::FromInt(EdgeCodes[i + 1]), this, FColor::Black, 1.f);
+		}
+	}
 //
 	//UE_LOG(LogTemp, Warning, TEXT("\n\n"));
 	//for(int i = 0; i < BaseGridQuads[0].Points.Num(); i++)
@@ -1045,7 +980,7 @@ void AGridGenerator::ReorderQuadNeighbours()
 			NeighbourCenters.Add(BaseGridQuads[CurrentQuad.Neighbours[j]].Center);
 
 		SortPoints(NeighbourCenters, NewNeighbourOrder);
-		TArray<int> NeighbourCopy;// = 
+		TArray<int> NeighbourCopy;
 		
 		for(int j = 0; j < NewNeighbourOrder.Num(); j++)
 		{
@@ -1094,6 +1029,463 @@ void AGridGenerator::ReorderQuadNeighbours()
 			}
 		}
 	}
+}
+
+void AGridGenerator::LogSuperpositionOptions(const FCell& Cell)
+{
+	for(int i = 0; i < Cell.Candidates.Num(); i++)
+		UE_LOG(LogTemp, Warning, TEXT("Cell: %d, Option: %s"), Cell.Index, *Cell.Candidates[i].ToString());
+	UE_LOG(LogTemp, Warning, TEXT("--------------------------------------"));
+
+}
+
+void AGridGenerator::LogSuperpositionOptions(const TArray<FCell*>& Cells)
+{
+	for(int i = 0; i < Cells.Num(); i++)
+		LogSuperpositionOptions(*Cells[i]);
+}
+
+void AGridGenerator::GetMarchingBitsForCell(FCell& Cell)
+{
+	int MinCorner = -1;
+	TArray<int> LowerCorners;
+	TArray<int> UpperCorners;
+	TArray<bool> CornersMask;
+	const FGridQuad& CorrespondingQuad = BaseGridQuads[Cell.Index];
+	for(int j = 0; j < 8; j++)
+	{
+		CornersMask.Add(Elevations[Cell.Elevation + j / 4].MarchingBits[CorrespondingQuad.Points[j % 4]]);
+		if(Elevations[Cell.Elevation + j / 4].MarchingBits[CorrespondingQuad.Points[j % 4]])
+		{
+			if(j < 4)
+				LowerCorners.Add(j);
+			else
+				UpperCorners.Add(j);
+			if(MinCorner == -1)
+				MinCorner = j;
+		}
+	}
+
+	Cell.RotationAmount = 0;
+	
+	if(LowerCorners.Num())
+	{
+		//Arranging so the first lower corner is the least number
+		if(LowerCorners.Num() >= 2)
+		{
+			for(int j = 0; j < LowerCorners.Num() - 1; j++)
+			{
+				if(LowerCorners[j] != LowerCorners[j + 1] - 1)
+				{
+					for(int p = 0; p < LowerCorners.Num() - j - 1; p++)
+					{
+						const int LastElement = LowerCorners.Last();
+						for(int k = LowerCorners.Num() - 1; k >= 1; k--)
+						{
+							LowerCorners[k] = LowerCorners[k - 1];
+						}
+						LowerCorners[0] = LastElement;
+					}
+					break;
+				}
+			}
+		}
+		if(LowerCorners[0] != 0)
+		{
+			const int RotationAmount = 4 - LowerCorners[0];
+			Cell.RotationAmount = RotationAmount;
+			for(int j = 0; j < LowerCorners.Num(); j++)
+			{
+				LowerCorners[j] = (LowerCorners[j] + RotationAmount) % 4;
+			}
+			
+			for(int j = 0; j < UpperCorners.Num(); j++)
+			{
+				UpperCorners[j] = (UpperCorners[j] + RotationAmount) % 4 + 4;
+			}
+		}
+	}
+	if(UpperCorners.Num() && (!LowerCorners.Num() || LowerCorners.Num() == 4))
+	{
+		if(UpperCorners.Num() >= 2)
+		{
+			for(int j = 0; j < UpperCorners.Num() - 1; j++)
+			{
+				if(UpperCorners[j] != UpperCorners[j + 1] - 1)
+				{
+					for(int p = 0; p < UpperCorners.Num() - j - 1; p++)
+					{
+						const int LastElement = UpperCorners.Last();
+						for(int k = UpperCorners.Num() - 1; k >= 1; k--)
+						{
+							UpperCorners[k] = UpperCorners[k - 1];
+						}
+						UpperCorners[0] = LastElement;
+					}
+					break;
+				}
+			}
+		}
+		if(UpperCorners[0] != 4)
+		{
+			const int RotationAmount = 7 - UpperCorners[0];
+			Cell.RotationAmount = RotationAmount;
+			for(int j = 0; j < UpperCorners.Num(); j++)
+			{
+				UpperCorners[j] = (UpperCorners[j] + RotationAmount) % 4 + 4;
+			}
+		}
+	}
+
+	Cell.MarchingBits = LowerCorners;
+	Cell.MarchingBits.Append(UpperCorners);
+}
+
+TArray<FCell*> AGridGenerator::GetCellsToCheck(const int Elevation, const int MarchingBitUpdated)
+{
+	TArray<FCell*> BuildingCells;
+	
+	//Add initial cells (the ones the marching bit updated is part of)
+	TArray<FCell*> CellsToCheck;
+	for(int i = 0; i < BaseGridPoints[MarchingBitUpdated].PartOfQuads.Num(); i++)
+		CellsToCheck.Add(&Elevations[Elevation].Cells[BaseGridPoints[MarchingBitUpdated].PartOfQuads[i]]);
+	
+	TArray<FCell*> CheckedCells;
+	
+	while(CellsToCheck.Num())
+	{
+		//Get first cell and remove it from check array
+		FCell* CurrentCell = CellsToCheck[0];
+		CellsToCheck.RemoveAt(0);
+		CheckedCells.Add(CurrentCell);
+		
+		//Check cell neighbours
+		const TArray<int> CurrentCellsPoints = BaseGridQuads[CurrentCell->Index].Points;
+		
+		//should always be 4, but just in case
+		for(int i = 0; i < CurrentCellsPoints.Num(); i++)
+		{
+			//Add neighbours containing that point (if they're valid)
+			if(Elevations[CurrentCell->Elevation].MarchingBits[CurrentCellsPoints[i]])
+			{
+				BuildingCells.AddUnique(CurrentCell);
+				BuildingCells.Last()->ChosenMesh = false;
+				const int PreviousNeighbourIndex = i - 1 < 0 ? CurrentCellsPoints.Num() - 1 : i - 1;
+				const int NextNeighbourIndex = i;
+
+				const int PreviousNeighbour = BaseGridQuads[CurrentCell->Index].OffsetNeighbours[PreviousNeighbourIndex];
+				const int NextNeighbour = BaseGridQuads[CurrentCell->Index].OffsetNeighbours[NextNeighbourIndex];
+				if(PreviousNeighbour != -1)
+				{
+					FCell* PreviousNeighbourCell = &Elevations[CurrentCell->Elevation].Cells[PreviousNeighbour];
+					if(!CheckedCells.Contains(PreviousNeighbourCell))
+					{
+						CellsToCheck.AddUnique(PreviousNeighbourCell);
+					}
+				}
+
+				if(NextNeighbour != -1)
+				{
+					FCell* NextNeighbourCell = &Elevations[CurrentCell->Elevation].Cells[NextNeighbour];
+					if(!CheckedCells.Contains(NextNeighbourCell))
+					{
+						CellsToCheck.AddUnique(NextNeighbourCell);
+					}
+				}
+			}
+		}
+
+		//Add above and bellow cells
+		const int BelowElevation = CurrentCell->Elevation - 1;
+		const int AboveElevation = CurrentCell->Elevation + 1;
+		
+		if(BelowElevation > 0 && BelowElevation < MaxElevation)
+		{
+			FCell* BelowCell = &Elevations[BelowElevation].Cells[CurrentCell->Index]; 
+			if(!CheckedCells.Contains(BelowCell))
+				CellsToCheck.AddUnique(BelowCell);
+		}
+
+		if(AboveElevation > 0 && AboveElevation < MaxElevation)
+		{
+			FCell* AboveCell = &Elevations[AboveElevation].Cells[CurrentCell->Index];
+			if(!CheckedCells.Contains(AboveCell))
+				CellsToCheck.AddUnique(AboveCell);
+		}
+	}
+
+	return BuildingCells;
+	
+	//for(int i = 0; i < BuildingCells.Num(); i++)
+	//{
+	//	UE_LOG(LogTemp, Warning, TEXT("Cell: %d, %d"), BuildingCells[i].Elevation, BuildingCells[i].Index);
+	//}
+	//UE_LOG(LogTemp, Warning, TEXT("----------------------\n"));
+}
+
+void AGridGenerator::CalculateCandidates(TArray<FCell*>& Cells)
+{
+	TArray<FBuildingMeshData*> TableRows;
+	//Optimize to only calculate for the ones had their bit changed
+	MeshTable->GetAllRows(TEXT("CalculateSuperposition"), TableRows);
+	for(int i = 0; i < Cells.Num(); i++)
+	{
+		GetMarchingBitsForCell(*Cells[i]);
+		for(int j = 0; j < TableRows.Num(); j++)
+		{
+			//Sanity check
+			if(TableRows[j] == nullptr)
+				return;
+
+			if(TableRows[j]->Corners == Cells[i]->MarchingBits)
+			{
+				Cells[i]->Candidates.Add(TableRows[j]->Name);
+				//Shift borders
+				TArray<int> MeshBorders = TableRows[j]->EdgeCodes;
+				TArray<int> SideMeshBorders = MeshBorders;
+
+				const int Cycle = (4 - Cells[i]->RotationAmount) % 4;
+				for(int k = 1; k < 5; k++)
+				{
+					int NewIndex = k - Cycle;
+					if(NewIndex <= 0)
+						NewIndex += 4;
+					if(NewIndex >= 5)
+						NewIndex -= 4;
+					MeshBorders[k] = SideMeshBorders[NewIndex];
+				}
+				
+				Cells[i]->CandidateBorders.Add(MeshBorders);
+				
+				FGridQuad& Quad = BaseGridQuads[Cells[i]->Index];
+				if(Cells[i]->CandidateBorders.Num() == 1 && Cells[i]->Elevation == 0)
+				{
+					for(int k = 0; k < Quad.Points.Num() && (k + 1) < Cells[i]->CandidateBorders[0].Num(); k++)
+					{
+						FVector Pos = (GetBasePointCoordinates(Quad.Points[k]) + GetBasePointCoordinates(Quad.Points[(k + 1) % Quad.Points.Num()])) / 2.f;
+						Pos.Z = 0.f;
+						FVector Direction = (Quad.Center - Pos).GetSafeNormal();
+						Pos += Direction * 30.f; 
+						Pos.Z = 200.f;
+						DrawDebugString(GetWorld(), Pos, FString::FromInt(Cells[i]->CandidateBorders[0][k + 1]), this, FColor::Black, 15.f);
+					}
+				}
+			}
+		}
+	}
+}
+
+void AGridGenerator::PropagateChoice(TArray<FCell>& Cells, const FCell& UpdatedCell)
+{
+	TArray<FCell*> CellsToPropagate;
+	for(int i = 0; i < UpdatedCell.Neighbours.Num(); i++)
+	{
+		int CellArrayIndex = -1;
+		for(int j = 0; j < Cells.Num(); j++)
+		{
+			if(Cells[j].Elevation == UpdatedCell.Neighbours[i].Key && Cells[j].Index == UpdatedCell.Neighbours[i].Value)
+			{
+				CellArrayIndex = j;
+				break;
+			}
+		}
+		if(CellArrayIndex == -1)
+			continue;
+		FCell& Neighbour = Cells[CellArrayIndex];// = Elevations[UpdatedCell.Neighbours[i].Key].Cells[UpdatedCell.Neighbours[i].Value];
+		//Bottom neighbour
+		if(Neighbour.Elevation < UpdatedCell.Elevation)
+		{
+			//Neighbour candidates were modified
+			if(CheckNeighbourCandidates(UpdatedCell, Neighbour, 0, 5))
+			{
+				CellsToPropagate.Add(&Neighbour);
+			}
+		}
+		else if(Neighbour.Elevation > UpdatedCell.Elevation)
+		{
+			//Neighbour candidates were modified
+			if(CheckNeighbourCandidates(UpdatedCell, Neighbour, 5, 0))
+			{
+				CellsToPropagate.Add(&Neighbour);
+			}
+		}
+		else
+		{
+			const int UpdatedCellIndex = Neighbour.Neighbours.Find(TPair<int, int>(UpdatedCell.Elevation, UpdatedCell.Index));
+			if(CheckNeighbourCandidates(UpdatedCell, Neighbour, i, UpdatedCellIndex))
+			{
+				CellsToPropagate.Add(&Neighbour);
+			}
+		}
+	}
+
+	for(int i = 0; i < CellsToPropagate.Num(); i++)
+	{
+		PropagateChoice(Cells, *CellsToPropagate[i]);
+	}
+}
+
+void AGridGenerator::SolveWVC(TArray<FCell*>& OriginalCells, TArray<FCell>& CopyCells, TArray<int> CellOrder)
+{
+	while(int LowestEntropy = GetLowestEntropyCell(CopyCells) != -1)
+    {
+    	CellOrder.Add(LowestEntropy);
+    	int CandidateChosen = FMath::RandRange(0, CopyCells[LowestEntropy].Candidates.Num() - 1);
+    	const FName CandidateName = CopyCells[LowestEntropy].Candidates[CandidateChosen];
+    	const TArray<int> CandidateBorders = CopyCells[LowestEntropy].CandidateBorders[CandidateChosen];
+
+		CopyCells[LowestEntropy].DiscardedCandidates.Append(CopyCells[LowestEntropy].Candidates);
+		CopyCells[LowestEntropy].DiscardedCandidateBorders.Append(CopyCells[LowestEntropy].CandidateBorders);
+
+		const int RemoveIndex = CopyCells[LowestEntropy].DiscardedCandidates.Find(CandidateName);
+		CopyCells[LowestEntropy].DiscardedCandidates.RemoveAt(RemoveIndex);
+		CopyCells[LowestEntropy].DiscardedCandidateBorders.RemoveAt(RemoveIndex);
+		
+    	CopyCells[LowestEntropy].Candidates = TArray<FName>({CandidateName});
+    	CopyCells[LowestEntropy].CandidateBorders = TArray<TArray<int>>({CandidateBorders});
+    	PropagateChoice(CopyCells, CopyCells[LowestEntropy]);
+    	//CopyBuildingCells[LowestEntropy]->ChosenMesh = true;
+    }
+
+	int Retry = false;
+    for(int i = 0; i < CopyCells.Num(); i++)
+    {
+    	if(CopyCells[i].Candidates.Num() == 0)
+    	{
+    		for(int j = CellOrder.Num() - 1; j >= 0; j--)
+    		{
+    			if(OriginalCells[CellOrder[j]]->Candidates.Num() == 1)
+    			{
+    				if(j == 0)
+    				{
+    					UE_LOG(LogTemp, Error, TEXT("CAN'T FIND SOLUTION"));
+    					break;
+    				}
+				    else 
+				    {
+						OriginalCells[CellOrder[j]]->Candidates.Append(OriginalCells[CellOrder[j]]->DiscardedCandidates);
+						OriginalCells[CellOrder[j]]->CandidateBorders.Append(OriginalCells[CellOrder[j]]->DiscardedCandidateBorders);
+
+				    	OriginalCells[CellOrder[j]]->DiscardedCandidates.Empty();
+				    	OriginalCells[CellOrder[j]]->DiscardedCandidateBorders.Empty();
+				    	
+				    	CopyCells[CellOrder[j]].Candidates = OriginalCells[CellOrder[j]]->Candidates;
+				    	CopyCells[CellOrder[j]].CandidateBorders = OriginalCells[CellOrder[j]]->CandidateBorders;
+
+				    	CopyCells[CellOrder[j]].DiscardedCandidates.Empty();
+				    	CopyCells[CellOrder[j]].DiscardedCandidateBorders.Empty();
+				    	CellOrder.Pop();
+				    	j--;
+				    }
+    			}
+    			else
+    			{
+    				const int IndexToRemove = OriginalCells[CellOrder[j]]->Candidates.Find(CopyCells[CellOrder[j]].Candidates[0]);
+    				OriginalCells[CellOrder[j]]->DiscardedCandidates.Add(OriginalCells[CellOrder[j]]->Candidates[IndexToRemove]);
+    				OriginalCells[CellOrder[j]]->DiscardedCandidateBorders.Add(OriginalCells[CellOrder[j]]->CandidateBorders[IndexToRemove]);
+    				
+    				OriginalCells[CellOrder[j]]->Candidates.RemoveAt(IndexToRemove);
+    				OriginalCells[CellOrder[j]]->CandidateBorders.RemoveAt(IndexToRemove);
+    				
+    				CopyCells[CellOrder[j]].Candidates = OriginalCells[CellOrder[j]]->Candidates;
+    				CopyCells[CellOrder[j]].CandidateBorders = OriginalCells[CellOrder[j]]->CandidateBorders;
+
+    				CopyCells[CellOrder[j]].DiscardedCandidates.Empty();
+    				CopyCells[CellOrder[j]].DiscardedCandidateBorders.Empty();
+    				Retry = true;
+    			}
+    		}
+    		break;
+    	}
+    }
+
+	if(Retry)
+	{
+		SolveWVC(OriginalCells, CopyCells, CellOrder);
+	}
+}
+
+void AGridGenerator::CreateCellMeshes(const TArray<FCell*>& Cells)
+{
+	for(int i = 0; i < Cells.Num(); i++)
+	{
+		if(Cells[i]->Candidates.Num() == 1)
+		{
+			const auto Find = Elevations[Cells[i]->Elevation].BuildingPieces.Find(Cells[i]->Index);
+			TObjectPtr<ABuildingPiece> BuildingPiece;
+	
+			if(Find)
+			{
+				BuildingPiece = *Find;
+			}
+			else
+			{
+				const FGridQuad& CorrespondingQuad = BaseGridQuads[Cells[i]->Index];
+				FActorSpawnParameters SpawnParameters;
+				BuildingPiece = GetWorld()->SpawnActor<ABuildingPiece>(BuildingPieceToSpawn, CorrespondingQuad.Center, FRotator(0, 0, 0));
+				BuildingPiece->CorrespondingQuadIndex = Cells[i]->Index;
+				BuildingPiece->Grid = this;
+				BuildingPiece->Elevation = Cells[i]->Elevation;
+				Elevations[Cells[i]->Elevation].BuildingPieces.Add(Cells[i]->Index, BuildingPiece);
+				//DrawDebugBox(GetWorld(), BaseGridPoints[CorrespondingQuad.Points[0]].Location + FVector(0.f, 0.f, 160.f), FVector(5.f), FColor::Red, false, 10, 0, 2.f);
+			}
+			TArray<FVector> CageBase;
+			for(int k = 0; k < 4; k++)
+				CageBase.Add(GetBasePointCoordinates(BaseGridQuads[Cells[i]->Index].Points[k]));
+			
+			const auto Row = BuildingPiece->DataTable->FindRow<FBuildingMeshData>(Cells[i]->Candidates[0], "MeshCornersRow");
+			check(Row);
+			BuildingPiece->SetStaticMesh(Row->StaticMesh);
+			BuildingPiece->DeformMesh(CageBase, 200.f, Cells[i]->RotationAmount * 90.f);
+		}
+	}
+}
+
+int AGridGenerator::GetLowestEntropyCell(const TArray<FCell>& Cells)
+{
+	if(!Cells.Num())
+		return -1;
+	int LowestEntropyIndex = 0;
+	int LowestEntropy = Cells[0].Candidates.Num();
+	for(int i = 1; i < Cells.Num(); i++)
+	{
+		if(Cells[i].Candidates.Num() < LowestEntropy)
+		{
+			LowestEntropy = Cells[i].Candidates.Num();
+			LowestEntropyIndex = i;
+		}
+	}
+	if(LowestEntropy <= 1)
+		return -1;
+	return LowestEntropyIndex;
+}
+
+bool AGridGenerator::CheckNeighbourCandidates(const FCell& Cell, FCell& NeighbourCell, const int CellBorderIndex,
+	const int NeighbourCellBorderIndex)
+{
+	bool Changed = false;
+	for(int i = 0; i < Cell.Candidates.Num(); i++)
+	{
+		const FEdgeAdjacencyData* AdjacencyRow = BorderAdjacencyTable->FindRow<FEdgeAdjacencyData>(FName(FString::FromInt(Cell.CandidateBorders[i][CellBorderIndex])), TEXT("Propagate Choice"));
+		check(AdjacencyRow);
+
+		const int AdjacencyRequired = AdjacencyRow->CorrespondingEdgeCode;
+		for(int j = 0; j < NeighbourCell.Candidates.Num(); j++)
+		{
+			if(NeighbourCell.CandidateBorders[j][NeighbourCellBorderIndex] != AdjacencyRequired)
+			{
+				NeighbourCell.DiscardedCandidates.Add(NeighbourCell.Candidates[j]);
+				NeighbourCell.DiscardedCandidateBorders.Add(NeighbourCell.CandidateBorders[j]);
+				
+				NeighbourCell.Candidates.RemoveAt(j);
+				NeighbourCell.CandidateBorders.RemoveAt(j);
+				j--;
+				Changed = true;
+			}
+		}
+	}
+
+	return Changed;
 }
 
 void AGridGenerator::Relax1()
@@ -1419,11 +1811,18 @@ void AGridGenerator::DrawSecondGrid()
 
 void AGridGenerator::UpdateMarchingBit(const int& ElevationLevel, const int& Index, const bool& Value)
 {
-	Elevations[ElevationLevel].MarchingBits[Index] = Value;
-	RunWVC(ElevationLevel, Index);
+	int ActualElevationLevel = ElevationLevel;
+	if(ElevationLevel < MaxElevation - 1)
+	{
+		if(Elevations[ElevationLevel].MarchingBits[Index] == false && ElevationLevel > 0)
+			ActualElevationLevel--;
+		Elevations[ActualElevationLevel + 1].MarchingBits[Index] = Value;
+	}
+	Elevations[ActualElevationLevel].MarchingBits[Index] = Value;
+	RunWVC(ActualElevationLevel, Index);
 	for(int i = 0; i < BaseGridPoints[Index].PartOfQuads.Num(); i++)
 	{
-		UpdateBuildingPiece(ElevationLevel, BaseGridPoints[Index].PartOfQuads[i]);
+		UpdateBuildingPiece(ActualElevationLevel, BaseGridPoints[Index].PartOfQuads[i]);
 	}
 }
 
@@ -1511,8 +1910,11 @@ void AGridGenerator::UpdateBuildingPiece(const int& ElevationLevel, const int& I
 	}
 
 	BuildingPiece->MeshRotation = Rotation;
+
+	FCell Cell(ElevationLevel, Index);
+	GetMarchingBitsForCell(Cell);
 	
-	if(!LowerCorners.Num() && !UpperCorners.Num())
+	if(!Cell.MarchingBits.Num() || Cell.MarchingBits.Num() == 8)
 	{
 		Elevations[ElevationLevel].BuildingPieces.Remove(Index);
 		World->DestroyActor(BuildingPiece);
@@ -1522,7 +1924,7 @@ void AGridGenerator::UpdateBuildingPiece(const int& ElevationLevel, const int& I
 	TArray<FName> Candidates;
 	TArray<int> AllCorners = LowerCorners;
 	AllCorners.Append(UpperCorners);
-
+	AllCorners = Cell.MarchingBits;
 	BuildingPiece->Corners = AllCorners;
 
 	TArray<FBuildingMeshData*> TableRows;

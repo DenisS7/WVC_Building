@@ -92,7 +92,7 @@ void APlayerCamera::OnLeftMouseButtonPressed()
 
 	const FGridShape& GridShape = Grid->GetBuildingGridShapes()[MarchingBit];
 	//Elevation will be changed
-	Grid->UpdateMarchingBit(0, GridShape.CorrespondingBaseGridPoint, true);//MarchingBits[0][GridShape.CorrespondingGrid1Point] = true;
+	Grid->UpdateMarchingBit(MarchingBitElevation, GridShape.CorrespondingBaseGridPoint, true);//MarchingBits[0][GridShape.CorrespondingGrid1Point] = true;
 	
 	//WVC Step to determine the pool
 }

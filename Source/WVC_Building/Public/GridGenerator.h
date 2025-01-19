@@ -169,12 +169,48 @@ struct FVoxelConfig
 };
 
 USTRUCT(BlueprintType)
+struct FCell
+{
+	GENERATED_BODY()
+	
+	int Elevation = -1;
+	int Index = -1;
+
+	TArray<FName> Candidates;
+	TArray<TArray<int>> CandidateBorders;
+
+	TArray<FName> DiscardedCandidates;
+	TArray<TArray<int>> DiscardedCandidateBorders;
+	
+	int RotationAmount = 0;
+	bool ChosenMesh = false;
+
+	TArray<TPair<int, int>> Neighbours;
+	
+	TArray<int> MarchingBits;
+
+	FCell() {}
+	
+	FCell(const int InElevation, const int InIndex)
+		: Elevation(InElevation), Index(InIndex)
+	{}
+
+	bool operator==(const FCell& Other) const
+	{
+		return Elevation == Other.Elevation && Index == Other.Index;
+	}
+};
+
+USTRUCT(BlueprintType)
 struct FElevationData
 {
 	GENERATED_BODY()
 
 	UPROPERTY(BlueprintReadOnly)
 	TArray<bool> MarchingBits;
+
+	UPROPERTY(BlueprintReadOnly)
+	TMap<int, FCell> Cells;
 
 	UPROPERTY(BlueprintReadOnly)
 	TMap<int, TObjectPtr<ABuildingPiece>> BuildingPieces;
@@ -186,6 +222,9 @@ struct FElevationData
 		MarchingBits.Init(false, NumBits);
 	}
 };
+
+typedef TPair<int, int> FCellIndex;
+
 
 UCLASS()
 class WVC_BUILDING_API AGridGenerator : public AActor
@@ -299,7 +338,6 @@ public:
 	const TArray<FGridQuad>& GetBaseGridQuads() const { return BaseGridQuads; }
 	const TArray<FGridShape>& GetBuildingGridShapes() const { return BuildingGridShapes; }
 	const FElevationData& GetElevationData(const int& Level) const { return Elevations[Level]; }
-
 	void RunWVC(const int Elevation, const int MarchingBitUpdated);
 	
 	UFUNCTION(BlueprintCallable, Category = "GridGenerator")
@@ -331,6 +369,19 @@ protected:
 	void RelaxAndCreateSecondGrid();
 	void ReorderQuadNeighbours();
 
+	void LogSuperpositionOptions(const FCell& Cell);
+	void LogSuperpositionOptions(const TArray<FCell*>& Cells);
+	void GetMarchingBitsForCell(FCell& Cell);
+	int GetLowestEntropyCell(const TArray<FCell>& Cells);
+	bool CheckNeighbourCandidates(const FCell& Cell, FCell& NeighbourCell, const int CellBorderIndex, const int NeighbourCellBorderIndex);
+	
+	TArray<FCell*> GetCellsToCheck(const int Elevation, const int MarchingBitUpdated);
+	void CalculateCandidates(TArray<FCell*>& Cells);
+	void PropagateChoice(TArray<FCell>& Cells, const FCell& UpdatedCell);
+	void SolveWVC(TArray<FCell*>& OriginalCells, TArray<FCell>& CopyCells, TArray<int> CellOrder = TArray<int>());
+	void CreateCellMeshes(const TArray<FCell*>& Cells);
+	
+	
 	UPROPERTY(BlueprintReadOnly)
 	FVector BaseGridCenter = FVector::ZeroVector;
 	
@@ -359,6 +410,12 @@ protected:
 	
 	UPROPERTY(BlueprintReadOnly, EditAnywhere)
 	UDynamicMeshComponent* HoveredShapeMesh = nullptr;
+
+	UPROPERTY(BlueprintReadOnly, EditAnywhere)
+	UDataTable* MeshTable;
+	
+	UPROPERTY(BlueprintReadOnly, EditAnywhere)
+	UDataTable* BorderAdjacencyTable;
 	
 	uint32 IterationsUsed1 = 0;
 	uint32 IterationsUsed2 = 0;
@@ -385,6 +442,7 @@ protected:
 	
 	UPROPERTY(BlueprintReadOnly, EditDefaultsOnly)
 	TSubclassOf<ABuildingPiece> BuildingPieceToSpawn;
+
 
 public:
 	
