@@ -376,7 +376,8 @@ protected:
 	void GetMarchingBitsForCell(FCell& Cell);
 	int GetLowestEntropyCell(const TArray<FCell>& Cells);
 	bool CheckNeighbourCandidates(const FCell& Cell, FCell& NeighbourCell, const int CellBorderIndex, const int NeighbourCellBorderIndex);
-	
+
+	void ResetCells(TArray<FCell*>& Cells);
 	TArray<FCell*> GetCellsToCheck(const int Elevation, const int MarchingBitUpdated);
 	void CalculateCandidates(TArray<FCell*>& Cells);
 	void PropagateChoice(TArray<FCell>& Cells, const FCell& UpdatedCell);

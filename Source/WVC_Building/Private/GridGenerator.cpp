@@ -36,6 +36,7 @@ AGridGenerator::AGridGenerator()
 void AGridGenerator::RunWVC(const int Elevation, const int MarchingBitUpdated)
 {
 	TArray<FCell*> BuildingCells = GetCellsToCheck(Elevation, MarchingBitUpdated);
+	ResetCells(BuildingCells);
 	CalculateCandidates(BuildingCells);
 	LogSuperpositionOptions(BuildingCells);
 	TArray<int> CellOrder;
@@ -1034,8 +1035,9 @@ void AGridGenerator::ReorderQuadNeighbours()
 
 void AGridGenerator::LogSuperpositionOptions(const FCell& Cell)
 {
+	UE_LOG(LogTemp, Error, TEXT("Elevation: %d - Cell: %d"), Cell.Elevation, Cell.Index);
 	for(int i = 0; i < Cell.Candidates.Num(); i++)
-		UE_LOG(LogTemp, Warning, TEXT("Cell: %d, Option: %s"), Cell.Index, *Cell.Candidates[i].ToString());
+		UE_LOG(LogTemp, Warning, TEXT("Option: %s"), *Cell.Candidates[i].ToString());
 	UE_LOG(LogTemp, Warning, TEXT("--------------------------------------"));
 
 }
@@ -1086,6 +1088,16 @@ void AGridGenerator::GetMarchingBitsForCell(FCell& Cell)
 							LowerCorners[k] = LowerCorners[k - 1];
 						}
 						LowerCorners[0] = LastElement;
+						
+						if(UpperCorners.Num() >= 2)
+						{
+							const int UpperLastElement = UpperCorners.Last();
+							for(int k = UpperCorners.Num() - 1; k >= 1; k--)
+							{
+								UpperCorners[k] = UpperCorners[k - 1];
+							}
+							UpperCorners[0] = UpperLastElement;
+						}
 					}
 					break;
 				}
@@ -1567,6 +1579,19 @@ bool AGridGenerator::CheckNeighbourCandidates(const FCell& Cell, FCell& Neighbou
 	}
 
 	return Changed;
+}
+
+void AGridGenerator::ResetCells(TArray<FCell*>& Cells)
+{
+	for(int i = 0; i < Cells.Num(); i++)
+	{
+		Cells[i]->Candidates.Empty();
+		Cells[i]->CandidateBorders.Empty();
+		Cells[i]->DiscardedCandidates.Empty();
+		Cells[i]->DiscardedCandidateBorders.Empty();
+		Cells[i]->HasChosenCandidate = false;
+		Cells[i]->ChosenCandidate = FName("");
+	}
 }
 
 void AGridGenerator::Relax1()
