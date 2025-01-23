@@ -44,6 +44,7 @@ bool UtilityLibrary::GetGridAndBuildingMouseIsHoveringOver(const UWorld* World, 
 	Grid = Cast<AGridGenerator>(HitResult.GetActor());
 	if(Grid)
 	{
+		//Hits grid
 		HitBuildingIndex = -1;
 		HitBuildingIndex = Grid->DetermineWhichGridShapeAPointIsIn(HitResult.Location);
 		HitBuildingElevation = 0;
@@ -66,20 +67,24 @@ bool UtilityLibrary::GetGridAndBuildingMouseIsHoveringOver(const UWorld* World, 
 			HitBuildingElevation = AdjacentHitBuildingElevation = BuildingPiece->GetElevation();
 			const UProceduralMeshComponent* MeshComp = BuildingPiece->GetProceduralMeshComponent();
 			FBoxSphereBounds MeshBounds = MeshComp->GetLocalBounds();
+			//UE_LOG(LogTemp, Warning, TEXT("MeshBounds: %s, HitBuildingElevation: %d"), *MeshBounds.GetBox().GetExtent().ToString(), HitBuildingElevation);
 			if(HitResult.Location.Z < static_cast<float>(AdjacentHitBuildingElevation) * 200.f + 10.f)
 			{
 				--AdjacentHitBuildingElevation;
 				if(AdjacentHitBuildingElevation < 0)
 					return false;
 				AdjacentHitBuildingIndex = BaseShapeIndex;
+				//UE_LOG(LogTemp, Warning, TEXT("BOTTOM MeshBounds: %s, HitBuildingElevation: %d"), *MeshBounds.GetBox().GetExtent().ToString(), HitBuildingElevation);
 				return true;
 			}
-			if(HitResult.Location.Z > static_cast<float>(AdjacentHitBuildingElevation) * 200.f + 2.f * MeshBounds.GetBox().GetExtent().Z - 10.f)
+			if(HitResult.Location.Z > static_cast<float>(AdjacentHitBuildingElevation) * 200.f + 2.f * MeshBounds.GetBox().GetExtent().Z - 10.f
+				|| !Grid->GetElevationData(AdjacentHitBuildingElevation + 1).MarchingBits[Grid->GetBuildingGridShapes()[HitBuildingIndex].CorrespondingBaseGridPoint])
 			{
 				++AdjacentHitBuildingElevation;
 				if(AdjacentHitBuildingElevation >= Grid->GetMaxElevation())
 					return false;
 				AdjacentHitBuildingIndex = BaseShapeIndex;
+				//UE_LOG(LogTemp, Warning, TEXT("TOP MeshBounds: %s, HitBuildingElevation: %d"), *MeshBounds.GetBox().GetExtent().ToString(), HitBuildingElevation);
 				return true;
 			}
 			

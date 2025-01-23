@@ -72,13 +72,17 @@ void APlayerCamera::OnLeftMouseButtonPressed()
 		return;
 	}
 
+	//if on top allow
+	//if on sides, check there is one more at the top - if not also go on top
+
 	int MarchingBit = -1;
 	int MarchingBitElevation = -1;
-
+	bool IsAdjacent = false;
 	if(HitBuildingIndex != -1)
 	{
 		if(AdjacentBuildingIndex != -1)
 		{
+			IsAdjacent = AdjacentBuildingElevation == HitBuildingElevation;
 			MarchingBit = AdjacentBuildingIndex;
 			MarchingBitElevation = AdjacentBuildingElevation;
 		}
@@ -92,7 +96,7 @@ void APlayerCamera::OnLeftMouseButtonPressed()
 
 	const FGridShape& GridShape = Grid->GetBuildingGridShapes()[MarchingBit];
 	//Elevation will be changed
-	Grid->UpdateMarchingBit(MarchingBitElevation, GridShape.CorrespondingBaseGridPoint, true);//MarchingBits[0][GridShape.CorrespondingGrid1Point] = true;
+	Grid->UpdateMarchingBit(MarchingBitElevation, GridShape.CorrespondingBaseGridPoint, true, IsAdjacent);//MarchingBits[0][GridShape.CorrespondingGrid1Point] = true;
 	
 	//WVC Step to determine the pool
 }
@@ -118,7 +122,7 @@ void APlayerCamera::OnRightMouseButtonPressed()
 	}
 	
 	const FGridShape& GridShape = Grid->GetBuildingGridShapes()[HitBuildingIndex];
-	Grid->UpdateMarchingBit(HitBuildingElevation, GridShape.CorrespondingBaseGridPoint, false);
+	Grid->UpdateMarchingBit(HitBuildingElevation, GridShape.CorrespondingBaseGridPoint, false, false);
 }
 
 void APlayerCamera::OnRightMouseButtonReleased()
@@ -191,9 +195,9 @@ void APlayerCamera::HoverOverShape()
 			CommonPoints.Insert(CommonPoints[0] * 0.5f + CommonPoints[1] * 0.5f, 1);
 			for(int i = CommonPoints.Num() - 1; i >= 0; i--)
 				CommonPoints.Add(CommonPoints[i] + FVector(0.f, 0.f, 200.f));
-			for(int i = 0; i < CommonPoints.Num(); i++)
-				CommonPoints[i].Z += static_cast<float>(Elevation) * 200.f;
 		}
+		for(int i = 0; i < CommonPoints.Num(); i++)
+			CommonPoints[i].Z += static_cast<float>(Elevation) * 200.f;
 		Grid->CreateAdjacentShapeMesh(CommonPoints);
 		//UE_LOG(LogTemp, Warning, TEXT("Current: %d,   Adjacent: %d,    Elevation: %d"), Shape, AdjacentShape, Elevation);
 	}

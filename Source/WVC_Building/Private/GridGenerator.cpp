@@ -38,7 +38,7 @@ void AGridGenerator::RunWVC(const int Elevation, const int MarchingBitUpdated)
 	TArray<FCell*> BuildingCells = GetCellsToCheck(Elevation, MarchingBitUpdated);
 	ResetCells(BuildingCells);
 	CalculateCandidates(BuildingCells);
-	LogSuperpositionOptions(BuildingCells);
+	//LogSuperpositionOptions(BuildingCells);
 	TArray<int> CellOrder;
 	bool FoundSolution = false;
 	TArray<FCell> CopyBuildingCells;
@@ -46,7 +46,7 @@ void AGridGenerator::RunWVC(const int Elevation, const int MarchingBitUpdated)
 	{
 		CopyBuildingCells.Add(*BuildingCells[i]);
 	}
-
+	//UE_LOG(LogTemp, Error, TEXT("11111111111111111111111111111111111111"));
 	SolveWVC(BuildingCells, CopyBuildingCells);
 	CreateCellMeshes(BuildingCells);
 }
@@ -1035,7 +1035,13 @@ void AGridGenerator::ReorderQuadNeighbours()
 
 void AGridGenerator::LogSuperpositionOptions(const FCell& Cell)
 {
-	UE_LOG(LogTemp, Error, TEXT("Elevation: %d - Cell: %d"), Cell.Elevation, Cell.Index);
+	FString MarchingString = "";
+	for(int i = 0; i < Cell.MarchingBits.Num(); i++)
+	{
+		MarchingString += FString::FromInt(Cell.MarchingBits[i]);
+		MarchingString += ", ";
+	}
+	UE_LOG(LogTemp, Error, TEXT("Elevation: %d - Cell: %d - Marching Bits: %s"), Cell.Elevation, Cell.Index, *MarchingString);
 	for(int i = 0; i < Cell.Candidates.Num(); i++)
 		UE_LOG(LogTemp, Warning, TEXT("Option: %s"), *Cell.Candidates[i].ToString());
 	UE_LOG(LogTemp, Warning, TEXT("--------------------------------------"));
@@ -1302,6 +1308,7 @@ void AGridGenerator::CalculateCandidates(TArray<FCell*>& Cells)
 
 void AGridGenerator::PropagateChoice(TArray<FCell>& Cells, const FCell& UpdatedCell)
 {
+	FString NeighboursString = "";
 	TArray<FCell*> CellsToPropagate;
 	for(int i = 0; i < UpdatedCell.Neighbours.Num(); i++)
 	{
@@ -1317,6 +1324,7 @@ void AGridGenerator::PropagateChoice(TArray<FCell>& Cells, const FCell& UpdatedC
 		if(CellArrayIndex == -1)
 			continue;
 		FCell& Neighbour = Cells[CellArrayIndex];// = Elevations[UpdatedCell.Neighbours[i].Key].Cells[UpdatedCell.Neighbours[i].Value];
+		NeighboursString += TEXT("            Elevation: ") + FString::FromInt(Neighbour.Elevation) + TEXT(" - Cell:") + FString::FromInt(Neighbour.Index) + TEXT("\n");
 		//Bottom neighbour
 		if(Neighbour.Elevation < UpdatedCell.Elevation)
 		{
@@ -1350,8 +1358,31 @@ void AGridGenerator::PropagateChoice(TArray<FCell>& Cells, const FCell& UpdatedC
 		}
 	}
 
+	//UE_LOG(LogTemp, Error, TEXT("AFTER PROPAGATING CELL: Elevation: %d - Cell: %d to NEIGHBOURS: %s"), UpdatedCell.Elevation, UpdatedCell.Index, *NeighboursString);
+	//for(int i = 0; i < Cells.Num(); i++)
+	//{
+	//	bool IsNeighbour = false;
+	//	for(int j = 0; j < UpdatedCell.Neighbours.Num(); j++)
+	//	{
+	//		if(Cells[i].Elevation == UpdatedCell.Neighbours[j].Key && Cells[i].Index == UpdatedCell.Neighbours[j].Value)
+	//		{
+	//			IsNeighbour = true;
+	//			break;
+	//		}
+	//	}
+	//	if(!IsNeighbour)
+	//		continue;
+	//	
+	//	UE_LOG(LogTemp, Warning, TEXT("    Elevation: %d - Cell: %d"), Cells[i].Elevation, Cells[i].Index);
+	//	for(int j = 0; j < Cells[i].Candidates.Num(); j++)
+	//		UE_LOG(LogTemp, Log, TEXT("    Option: %s"), *Cells[i].Candidates[j].ToString());
+	//	UE_LOG(LogTemp, Warning, TEXT("    --------------------------------------"));
+	//}
+	
 	for(int i = 0; i < CellsToPropagate.Num(); i++)
 	{
+		//UE_LOG(LogTemp, Error, TEXT("NOW PROPAGATING FROM CELL: Elevation: %d - Cell: %d to NEIGHBOUR: Neighbour Elevation: %d - Neighbour Cell: %d"), UpdatedCell.Elevation, UpdatedCell.Index, CellsToPropagate[i]->Elevation, CellsToPropagate[i]->Index);
+
 		PropagateChoice(Cells, *CellsToPropagate[i]);
 	}
 }
@@ -1359,10 +1390,11 @@ void AGridGenerator::PropagateChoice(TArray<FCell>& Cells, const FCell& UpdatedC
 bool AGridGenerator::SolveWVC(TArray<FCell*>& OriginalCells, TArray<FCell>& CopyCells, TArray<int> CellOrder)
 {
 	int LowestEntropy = GetLowestEntropyCell(CopyCells);
+	//UE_LOG(LogTemp, Log, TEXT("00000000000000000000000000000000000000000000"));
 	while(LowestEntropy != -1)
     {
     	CellOrder.Add(LowestEntropy);
-		int CandidateChosen = FMath::RandRange(0, CopyCells[LowestEntropy].Candidates.Num() - 1);
+	    const int CandidateChosen = FMath::RandRange(0, CopyCells[LowestEntropy].Candidates.Num() - 1);
     	CopyCells[LowestEntropy].ChosenCandidate = CopyCells[LowestEntropy].Candidates[CandidateChosen];
     	const TArray<int> CandidateBorders = CopyCells[LowestEntropy].CandidateBorders[CandidateChosen];
 
@@ -1375,6 +1407,16 @@ bool AGridGenerator::SolveWVC(TArray<FCell*>& OriginalCells, TArray<FCell>& Copy
 		
     	CopyCells[LowestEntropy].Candidates = TArray<FName>({CopyCells[LowestEntropy].ChosenCandidate});
     	CopyCells[LowestEntropy].CandidateBorders = TArray<TArray<int>>({CandidateBorders});
+
+		//UE_LOG(LogTemp, Error, TEXT("NEW CHOSEN MESH: Elevation: %d - Cell: %d WITH MESH: %s"), CopyCells[LowestEntropy].Elevation, CopyCells[LowestEntropy].Index, *CopyCells[LowestEntropy].ChosenCandidate.ToString());
+		//for(int i = 0; i < CopyCells.Num(); i++)
+		//{
+		//	UE_LOG(LogTemp, Warning, TEXT("Elevation: %d - Cell: %d"), CopyCells[i].Elevation, CopyCells[i].Index);
+		//	for(int j = 0; j < CopyCells[i].Candidates.Num(); j++)
+		//		UE_LOG(LogTemp, Log, TEXT("Option: %s"), *CopyCells[i].Candidates[j].ToString());
+		//	UE_LOG(LogTemp, Warning, TEXT("--------------------------------------"));
+		//}
+		
     	PropagateChoice(CopyCells, CopyCells[LowestEntropy]);
 		LowestEntropy = GetLowestEntropyCell(CopyCells);
     	//CopyBuildingCells[LowestEntropy]->ChosenMesh = true;
@@ -1470,7 +1512,7 @@ bool AGridGenerator::SolveWVC(TArray<FCell*>& OriginalCells, TArray<FCell>& Copy
 	for(int i = 0; i < CopyCells.Num(); i++)
 	{
 		FGridQuad& Quad = BaseGridQuads[CopyCells[i].Index];
-		if(CopyCells[i].CandidateBorders.Num() == 1 && CopyCells[i].Elevation == 0)
+		if(CopyCells[i].CandidateBorders.Num() == 1 && CopyCells[i].Elevation == 1)
 		{
 			for(int k = 0; k < Quad.Points.Num() && (k + 1) < CopyCells[i].CandidateBorders[0].Num(); k++)
 			{
@@ -1479,7 +1521,7 @@ bool AGridGenerator::SolveWVC(TArray<FCell*>& OriginalCells, TArray<FCell>& Copy
 				FVector Direction = (Quad.Center - Pos).GetSafeNormal();
 				Pos += Direction * 30.f; 
 				Pos.Z = 200.f;
-				DrawDebugString(GetWorld(), Pos, FString::FromInt(CopyCells[i].CandidateBorders[0][k + 1]), this, FColor::Black, 20.f);
+				DrawDebugString(GetWorld(), Pos, FString::FromInt(CopyCells[i].CandidateBorders[0][k + 1]), this, FColor::Black, 10.f);
 			}
 		}
 	}
@@ -1915,13 +1957,11 @@ void AGridGenerator::DrawSecondGrid()
 	}
 }
 
-void AGridGenerator::UpdateMarchingBit(const int& ElevationLevel, const int& Index, const bool& Value)
+void AGridGenerator::UpdateMarchingBit(const int ElevationLevel, const int Index, const bool Value, const bool IsAdjacent)
 {
 	int ActualElevationLevel = ElevationLevel;
-	if(ElevationLevel < MaxElevation - 1)
+	if(ElevationLevel == 0 || IsAdjacent)
 	{
-		//if(Elevations[ElevationLevel].MarchingBits[Index] == false && ElevationLevel > 0)
-		//	ActualElevationLevel--;
 		Elevations[ActualElevationLevel + 1].MarchingBits[Index] = Value;
 	}
 	Elevations[ActualElevationLevel].MarchingBits[Index] = Value;

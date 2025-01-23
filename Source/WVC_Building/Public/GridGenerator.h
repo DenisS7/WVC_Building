@@ -323,7 +323,7 @@ public:
 	void CreateAdjacentShapeMesh(const TArray<FVector>& Points);
 	void ResetShapeMesh();
 
-	void UpdateMarchingBit(const int& ElevationLevel, const int& Index, const bool& Value);
+	void UpdateMarchingBit(int ElevationLevel, int Index, bool Value, bool IsAdjacent);
 	void UpdateBuildingPiece(const int& ElevationLevel, const int& Index);
 	int DetermineWhichGridShapeAPointIsIn(const FVector& Point);
 	
