@@ -1383,7 +1383,7 @@ bool AGridGenerator::SolveWVC(TArray<FCell*>& OriginalCells, TArray<FCell>& Copy
 	int Retry = false;
     for(int i = 0; i < CopyCells.Num(); i++)
     {
-    	if(CopyCells[i].Candidates.Num() == 0)
+    	if(CopyCells[i].Candidates.Num() == 0 && CopyCells[i].MarchingBits.Num() != 8)
     	{
     		for(int j = CellOrder.Num() - 1; j >= 0; j--)
     		{
