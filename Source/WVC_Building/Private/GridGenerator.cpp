@@ -38,7 +38,7 @@ void AGridGenerator::RunWVC(const int Elevation, const int MarchingBitUpdated)
 	TArray<FCell*> BuildingCells = GetCellsToCheck(Elevation, MarchingBitUpdated);
 	ResetCells(BuildingCells);
 	CalculateCandidates(BuildingCells);
-	//LogSuperpositionOptions(BuildingCells);
+	LogSuperpositionOptions(BuildingCells);
 	TArray<int> CellOrder;
 	bool FoundSolution = false;
 	TArray<FCell> CopyBuildingCells;
@@ -46,7 +46,7 @@ void AGridGenerator::RunWVC(const int Elevation, const int MarchingBitUpdated)
 	{
 		CopyBuildingCells.Add(*BuildingCells[i]);
 	}
-	//UE_LOG(LogTemp, Error, TEXT("11111111111111111111111111111111111111"));
+	UE_LOG(LogTemp, Error, TEXT("11111111111111111111111111111111111111"));
 	SolveWVC(BuildingCells, CopyBuildingCells);
 	CreateCellMeshes(BuildingCells);
 }
@@ -139,7 +139,7 @@ void AGridGenerator::GenerateGrid()
 			if(BaseGridQuads[i].OffsetNeighbours[j] != -1)
 			{
 				const FVector Direction = (BaseGridQuads[BaseGridQuads[i].OffsetNeighbours[j]].Center - BaseGridQuads[i].Center).GetSafeNormal();
-				DrawDebugLine(GetWorld(), BaseGridQuads[i].Center, BaseGridQuads[BaseGridQuads[i].OffsetNeighbours[j]].Center - Direction * 100.f, Colors[j], true, -1, 0, 5.f);
+				//DrawDebugLine(GetWorld(), BaseGridQuads[i].Center, BaseGridQuads[BaseGridQuads[i].OffsetNeighbours[j]].Center - Direction * 100.f, Colors[j], true, -1, 0, 5.f);
 			}
 		}
 
@@ -1217,7 +1217,7 @@ TArray<FCell*> AGridGenerator::GetCellsToCheck(const int Elevation, const int Ma
 		const int Bellow = CurrentCell->Elevation - 1;
 		const int AboveElevation = CurrentCell->Elevation + 1;
 		// might break if there are upper marching bits and no lower ones
-		if(Bellow > 0 && Bellow < MaxElevation - 1)
+		if(Bellow >= 0 && Bellow < MaxElevation - 1)
 		{
 			FCell* BelowCell = &Elevations[Bellow].Cells[CurrentCell->Index];
 			for(int i = 0; i < CurrentCellsPoints.Num(); i++)
@@ -1228,15 +1228,27 @@ TArray<FCell*> AGridGenerator::GetCellsToCheck(const int Elevation, const int Ma
 						CellsToCheck.AddUnique(BelowCell);
 					break;
 				}
+				if(Elevations[CurrentCell->Elevation + 1].MarchingBits[CurrentCellsPoints[i]])
+				{
+					if(!CheckedCells.Contains(BelowCell))
+						CellsToCheck.AddUnique(BelowCell);
+					break;
+				}
 			}
 		}
 
-		if(AboveElevation > 0 && AboveElevation < MaxElevation - 1)
+		if(AboveElevation >= 0 && AboveElevation < MaxElevation - 1)
 		{
 			FCell* AboveCell = &Elevations[AboveElevation].Cells[CurrentCell->Index];
 			for(int i = 0; i < CurrentCellsPoints.Num(); i++)
 			{
 				if(Elevations[AboveElevation].MarchingBits[CurrentCellsPoints[i]])
+				{
+					if(!CheckedCells.Contains(AboveCell))
+						CellsToCheck.AddUnique(AboveCell);
+					break;
+				}
+				if(Elevations[AboveElevation + 1].MarchingBits[CurrentCellsPoints[i]])
 				{
 					if(!CheckedCells.Contains(AboveCell))
 						CellsToCheck.AddUnique(AboveCell);
@@ -1281,8 +1293,9 @@ void AGridGenerator::CalculateCandidates(TArray<FCell*>& Cells)
 			//Sanity check
 			if(TableRows[j] == nullptr)
 				return;
-
-			if(TableRows[j]->Corners == Cells[i]->MarchingBits)
+			TSet<int> Corners = TSet<int>(TableRows[j]->Corners);
+			TSet<int> MarchingBits = TSet<int>(Cells[i]->MarchingBits);
+			if(!Corners.Difference(MarchingBits).Num())
 			{
 				Cells[i]->Candidates.Add(TableRows[j]->Name);
 				//Shift borders
@@ -1381,7 +1394,7 @@ void AGridGenerator::PropagateChoice(TArray<FCell>& Cells, const FCell& UpdatedC
 	
 	for(int i = 0; i < CellsToPropagate.Num(); i++)
 	{
-		//UE_LOG(LogTemp, Error, TEXT("NOW PROPAGATING FROM CELL: Elevation: %d - Cell: %d to NEIGHBOUR: Neighbour Elevation: %d - Neighbour Cell: %d"), UpdatedCell.Elevation, UpdatedCell.Index, CellsToPropagate[i]->Elevation, CellsToPropagate[i]->Index);
+	//	UE_LOG(LogTemp, Error, TEXT("NOW PROPAGATING FROM CELL: Elevation: %d - Cell: %d to NEIGHBOUR: Neighbour Elevation: %d - Neighbour Cell: %d"), UpdatedCell.Elevation, UpdatedCell.Index, CellsToPropagate[i]->Elevation, CellsToPropagate[i]->Index);
 
 		PropagateChoice(Cells, *CellsToPropagate[i]);
 	}
@@ -1521,7 +1534,7 @@ bool AGridGenerator::SolveWVC(TArray<FCell*>& OriginalCells, TArray<FCell>& Copy
 				FVector Direction = (Quad.Center - Pos).GetSafeNormal();
 				Pos += Direction * 30.f; 
 				Pos.Z = 200.f;
-				DrawDebugString(GetWorld(), Pos, FString::FromInt(CopyCells[i].CandidateBorders[0][k + 1]), this, FColor::Black, 10.f);
+				//DrawDebugString(GetWorld(), Pos, FString::FromInt(CopyCells[i].CandidateBorders[0][k + 1]), this, FColor::Black, 10.f);
 			}
 		}
 	}
@@ -1551,7 +1564,7 @@ void AGridGenerator::CreateCellMeshes(const TArray<FCell*>& Cells)
 				BuildingPiece->Grid = this;
 				BuildingPiece->Elevation = Cells[i]->Elevation;
 				Elevations[Cells[i]->Elevation].BuildingPieces.Add(Cells[i]->Index, BuildingPiece);
-				DrawDebugBox(GetWorld(), BaseGridPoints[CorrespondingQuad.Points[0]].Location + FVector(0.f, 0.f, 160.f), FVector(5.f), FColor::Red, false, 10, 0, 2.f);
+				//DrawDebugBox(GetWorld(), BaseGridPoints[CorrespondingQuad.Points[0]].Location + FVector(0.f, 0.f, 160.f), FVector(5.f), FColor::Red, false, 10, 0, 2.f);
 			}
 			TArray<FVector> CageBase;
 			for(int k = 0; k < 4; k++)
@@ -2000,7 +2013,7 @@ void AGridGenerator::UpdateBuildingPiece(const int& ElevationLevel, const int& I
 		Elevations[ElevationLevel].BuildingPieces.Add(Index, BuildingPiece);
 		//UE_LOG(LogTemp, Warning, TEXT("SpawnIndex: %d"), BuildingPiece->CorrespondingQuadIndex);
 
-		DrawDebugBox(GetWorld(), BaseGridPoints[CorrespondingQuad.Points[0]].Location + FVector(0.f, 0.f, 160.f), FVector(5.f), FColor::Red, false, 10, 0, 2.f);
+		//DrawDebugBox(GetWorld(), BaseGridPoints[CorrespondingQuad.Points[0]].Location + FVector(0.f, 0.f, 160.f), FVector(5.f), FColor::Red, false, 10, 0, 2.f);
 	}
 	int TileConfig = 0;
 	TArray<int> LowerCorners;

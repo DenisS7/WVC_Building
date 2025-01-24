@@ -415,6 +415,9 @@ protected:
 	UDynamicMeshComponent* HoveredShapeMesh = nullptr;
 
 	UPROPERTY(BlueprintReadOnly, EditAnywhere)
+	UDataTable* OriginalMeshTable;
+
+	UPROPERTY(BlueprintReadOnly, EditAnywhere)
 	UDataTable* MeshTable;
 	
 	UPROPERTY(BlueprintReadOnly, EditAnywhere)
