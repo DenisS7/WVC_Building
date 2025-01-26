@@ -1295,6 +1295,10 @@ void AGridGenerator::CalculateCandidates(TArray<FCell*>& Cells)
 				return;
 			TSet<int> Corners = TSet<int>(TableRows[j]->Corners);
 			TSet<int> MarchingBits = TSet<int>(Cells[i]->MarchingBits);
+			if (Corners.Num() != MarchingBits.Num())
+			{
+				continue;
+			}
 			if(!Corners.Difference(MarchingBits).Num())
 			{
 				Cells[i]->Candidates.Add(TableRows[j]->Name);
@@ -1509,14 +1513,13 @@ bool AGridGenerator::SolveWVC(TArray<FCell*>& OriginalCells, TArray<FCell>& Copy
 
     				for(int k = 0; k < CopyCells.Num(); k++)
     				{
-    					if(CellOrder.Contains(k) && k != CellOrder[j])
+    					if(CellOrder.Contains(k))
     					{
-    						int Index = OriginalCells[k]->Candidates.Find(CopyCells[k].ChosenCandidate);
+    						const int Index = OriginalCells[k]->Candidates.Find(CopyCells[k].ChosenCandidate);
     						check(Index != INDEX_NONE)
 
     						CopyCells[k].Candidates = TArray<FName>({OriginalCells[k]->Candidates[Index]});
     						CopyCells[k].CandidateBorders = TArray<TArray<int>>({OriginalCells[k]->CandidateBorders[Index]});
-
     						
     						continue;
     					}
