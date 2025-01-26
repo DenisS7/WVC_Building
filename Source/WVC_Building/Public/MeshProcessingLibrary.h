@@ -5,6 +5,8 @@
 #include "CoreMinimal.h"
 #include "MeshProcessingLibrary.generated.h"
 
+struct FBuildingMeshData;
+
 UENUM(BlueprintType)
 enum class EEdgeSide : uint8
 {
@@ -24,16 +26,21 @@ class WVC_BUILDING_API UMeshProcessingLibrary : public UBlueprintFunctionLibrary
 {
 	GENERATED_BODY()
 public:
-	UFUNCTION(BlueprintCallable, Category = "MeshDataSingleton")
-    static void ProcessAllMeshes(UDataTable* MeshDataTable, UDataTable* EdgeAdjacencyTable, const FString& FolderPath);
-   
-    UFUNCTION(BlueprintCallable, Category = "MeshDataSingleton")
+	UFUNCTION(BlueprintCallable, Category = "MeshDataLibrary")
+    static void ProcessAllMeshes(UDataTable* MeshDataTable, UDataTable* VariationMeshTable, UDataTable* EdgeAdjacencyTable, const FString& FolderPath);
+
+	UFUNCTION(BlueprintCallable, Category = "MeshDataLibrary")
+	static void CreateRotationMeshes(UDataTable* OriginalMeshTable, UDataTable* VariationMeshTable);
+	
+    UFUNCTION(BlueprintCallable, Category = "MeshDataLibrary")
     static void GetMeshData(const FName& MeshName);
 
 private:
-
+	static TArray<int> RotateMarchingBits(const TArray<int>& MarchingBits, const int Rotation);
+	static bool DoesMeshHaveInteriorBorders(const FMeshDescription& MeshDescription);
 	static bool ProcessMeshData(const UStaticMesh* StaticMesh, TArray<int>& EdgeCodesOut, TMap<TArray<FIntVector>, TArray<FIntVector>>& EdgeVariations, TMap<TArray<FIntVector>, int>& EdgeCodes, TMap<int, int>& EdgeAdjacencies, UWorld* World = nullptr, const FVector& Center = FVector::ZeroVector);
-   
-    UFUNCTION(BlueprintCallable, Category = "MeshDataSingleton")
+	static UStaticMesh* CombineMeshes(const UStaticMesh* Mesh1, const UStaticMesh* Mesh2, const float Mesh2Rotation);
+	static void CreateAdditionalMeshes(const FBuildingMeshData* Row1, const FBuildingMeshData* Row2, UDataTable* VariationMeshTable);
+	UFUNCTION(BlueprintCallable, Category = "MeshDataLibrary")
     static void SaveMeshData();
 };

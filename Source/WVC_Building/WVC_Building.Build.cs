@@ -8,7 +8,11 @@ public class WVC_Building : ModuleRules
 	{
 		PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
 	
-		PublicDependencyModuleNames.AddRange(new string[] { "Core", "CoreUObject", "Engine", "InputCore", "EnhancedInput", "RHI", "GeometryScriptingCore", "GeometryFramework", "GeometryCore", "DynamicMesh", "ProceduralMeshComponent" });
+		PublicDependencyModuleNames.AddRange(new string[]
+		{
+			"Core", "CoreUObject", "Engine", "InputCore", "EnhancedInput", "RHI", "GeometryScriptingCore", "GeometryFramework", "GeometryCore", "DynamicMesh", "ProceduralMeshComponent",
+			"MeshDescription", "StaticMeshDescription", "MeshConversion"
+		});
 
 		PrivateDependencyModuleNames.AddRange(new string[] { "UnrealEd", "EditorFramework", "LevelEditor", "ProceduralMeshComponent" });
 

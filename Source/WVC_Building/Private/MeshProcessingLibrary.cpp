@@ -5,10 +5,11 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 #include "EdgeAdjacencyData.h"
+#include "StaticMeshOperations.h"
 #include "WVC_Building/Public/BuildingMeshData.h"
 #include "AssetRegistry/AssetRegistryModule.h"
 
-void UMeshProcessingLibrary::ProcessAllMeshes(UDataTable* MeshDataTable, UDataTable* EdgeAdjacencyTable, const FString& FolderPath)
+void UMeshProcessingLibrary::ProcessAllMeshes(UDataTable* MeshDataTable, UDataTable* VariationMeshTable, UDataTable* EdgeAdjacencyTable, const FString& FolderPath)
 {
 	TMap<TArray<FIntVector>, TArray<FIntVector>> EdgeVariations;
 	TMap<TArray<FIntVector>, int> EdgeCodes;
@@ -45,6 +46,10 @@ void UMeshProcessingLibrary::ProcessAllMeshes(UDataTable* MeshDataTable, UDataTa
 				MeshData.Name = MeshName;
 				MeshData.EdgeCodes = MeshEdgeCodes;
 				MeshData.StaticMesh = StaticMesh;
+				if(FBuildingMeshData* VariationRow = VariationMeshTable->FindRow<FBuildingMeshData>(MeshName, TEXT("ProcessAllMeshes")))
+				{
+					MeshData.Corners = VariationRow->Corners;
+				}
 				MeshDataTable->AddRow(MeshName, MeshData);
 			}
 		}
@@ -69,8 +74,72 @@ void UMeshProcessingLibrary::ProcessAllMeshes(UDataTable* MeshDataTable, UDataTa
 	}
 }
 
+void UMeshProcessingLibrary::CreateRotationMeshes(UDataTable* OriginalMeshTable, UDataTable* VariationMeshTable)
+{
+	TArray<FBuildingMeshData*> TableRows;
+	OriginalMeshTable->GetAllRows<FBuildingMeshData>(TEXT("ProcessAllMeshes"), TableRows);
+
+	for(int i = 0; i < TableRows.Num() - 1; i++)
+	{
+		for(int j = 0; j < TableRows.Num(); j++)
+		{
+			CreateAdditionalMeshes(TableRows[i], TableRows[j], VariationMeshTable);
+		}
+	}
+
+	//auto Row2 = OriginalMeshTable->FindRow<FBuildingMeshData>(Mesh2, TEXT("ProcessAllMeshes"));
+//
+	//CreateAdditionalMeshes(Row1, Row2);
+}
+
 void UMeshProcessingLibrary::GetMeshData(const FName& MeshName)
 {
+}
+
+TArray<int> UMeshProcessingLibrary::RotateMarchingBits(const TArray<int>& MarchingBits, const int Rotation)
+{
+	TArray<int> Output;
+	for(int i = 0; i < MarchingBits.Num(); i++)
+	{
+		Output.Add((MarchingBits[i] + Rotation) % 4);
+		if(MarchingBits[i] >= 4)
+			Output.Last() += 4;
+	}
+	return Output;
+}
+
+bool UMeshProcessingLibrary::DoesMeshHaveInteriorBorders(const FMeshDescription& MeshDescription)
+{
+	//TSet<FVertexID> BorderVertexIDs;
+	//
+	//for (const FEdgeID& EdgeID : MeshDescription.Edges().GetElementIDs())
+	//{
+	//	if (MeshDescription.GetEdgeConnectedPolygons(EdgeID).Num() == 1)
+	//	{
+	//		TArrayView<const FVertexID> EdgeVertices = MeshDescription.GetEdgeVertices(EdgeID);
+	//		BorderVertexIDs.Add(EdgeVertices[0]);
+	//		BorderVertexIDs.Add(EdgeVertices[1]);
+	//	}
+	//}
+//
+	//const TVertexAttributesConstRef<FVector> VertexPositions = MeshDescription.VertexAttributes().GetAttributesRef<FVector>(MeshAttribute::Vertex::Position);
+	//const float PieceExtent = 100.f - 1.f;
+	//for (const FVertexID& VertexID : BorderVertexIDs)
+	//{
+	//	const FVector Position = VertexPositions[VertexID];
+	//	//Point is on one of the borders
+	//	if(Position.X < -PieceExtent || Position.X > PieceExtent)
+	//		continue; 
+	//	if(Position.Y < -PieceExtent || Position.Y > PieceExtent)
+	//		continue;
+	//	if(Position.Z < 1.f || Position.Z > 2.f * PieceExtent + 1.f)
+	//		continue;
+//
+	//	//Point is somewhere in the middle
+	//	return true;
+	//}
+	
+	return false;
 }
 
 bool UMeshProcessingLibrary::ProcessMeshData(const UStaticMesh* StaticMesh, TArray<int>& EdgeCodesOut, TMap<TArray<FIntVector>, TArray<FIntVector>>& EdgeVariations, TMap<TArray<FIntVector>, int>& EdgeCodes, TMap<int, int>& EdgeAdjacencies, UWorld* World, const FVector& Center)
@@ -471,6 +540,156 @@ bool UMeshProcessingLibrary::ProcessMeshData(const UStaticMesh* StaticMesh, TArr
 	}
 	
 	return true;
+}
+
+void UMeshProcessingLibrary::CreateAdditionalMeshes(const FBuildingMeshData* Row1, const FBuildingMeshData* Row2, UDataTable* VariationMeshTable)
+{
+	if(!Row1 || !Row2)
+		return;
+
+	UStaticMesh* Mesh1 = Row1->StaticMesh;
+	UStaticMesh* Mesh2 = Row2->StaticMesh;
+
+	if(!Mesh1 || !Mesh2)
+		return;
+	
+	const TPair<bool, bool> Row1Pair = TPair<bool, bool>(Row1->Corners[0] < 4, Row1->Corners.Last() >= 4);
+	const TPair<bool, bool> Row2Pair = TPair<bool, bool>(Row2->Corners[0] < 4, Row2->Corners.Last() >= 4);
+	const TSet<int> Row1Set = TSet<int>(Row1->Corners);
+
+	for(int i = 0; i < 3; i++)
+	{
+		//90 and 270 degrees rotations 
+		if(i % 2 == 0 && Row1Pair == Row2Pair)
+			continue;
+
+		
+		const TArray<int> RotatedMesh2Bits = RotateMarchingBits(Row2->Corners, i + 1);
+		const TSet<int> Row2Set = TSet<int>(RotatedMesh2Bits);
+
+		//Row1 mesh and rotated row2 mesh overlap marching bits
+		if(Row1Set.Intersect(Row2Set).Num())
+			continue;
+
+		//don't want to combine meshes that are on top of each other as they should form a wall normally
+		bool ValidCombination = true;
+		for(int j = 0; j < Row1->Corners.Num(); j++)
+		{
+			int VerticalAdjacentBit = -1;
+			if(Row1->Corners[j] < 4)
+				VerticalAdjacentBit = Row1->Corners[j] + 4;
+			else
+				VerticalAdjacentBit = Row1->Corners[j] - 4;
+			if(Row2Set.Contains(VerticalAdjacentBit))
+			{
+				ValidCombination = false;
+				break;
+			}
+		}
+
+		if(!ValidCombination)
+			continue;
+
+
+		UStaticMesh* CombinedMesh = CombineMeshes(Row1->StaticMesh, Row2->StaticMesh, -static_cast<float>(i + 1) * 90.f);
+		if(!CombinedMesh)
+			continue;
+
+		FBuildingMeshData CombinedMeshData;
+		CombinedMeshData.Name = *CombinedMesh->GetName();
+		CombinedMeshData.StaticMesh = CombinedMesh;
+		CombinedMeshData.Corners = Row1->Corners;
+		CombinedMeshData.Corners.Append(RotatedMesh2Bits);
+		FBuildingMeshData* ExistingRow = VariationMeshTable->FindRow<FBuildingMeshData>(*CombinedMesh->GetName(), TEXT("Create Additional Meshes"));
+		if(ExistingRow)
+		{
+			ExistingRow->StaticMesh = CombinedMesh;
+			ExistingRow->Corners = CombinedMeshData.Corners;
+		}
+		else
+		{
+			VariationMeshTable->AddRow(*CombinedMesh->GetName(), CombinedMeshData);
+		}
+	}
+}
+
+UStaticMesh* UMeshProcessingLibrary::CombineMeshes(const UStaticMesh* Mesh1, const UStaticMesh* Mesh2,
+                                                   const float Mesh2Rotation)
+{
+	const FString PackagePath = TEXT("/Game/Assets/Meshes/AllMeshes");
+	const FString MeshName   = FString::Printf(TEXT("%s_%s_%d"), *Mesh1->GetName(), *Mesh2->GetName(), FMath::Abs(static_cast<int>(Mesh2Rotation)));
+	const FString FullPath = PackagePath / MeshName;
+
+	UPackage* Package = CreatePackage(*FullPath);
+	if (!Package)
+	{
+		UE_LOG(LogTemp, Error, TEXT("Could not create or find package %s"), *FullPath);
+		return nullptr;
+	}
+	
+	UStaticMesh* ExistingMesh = FindObject<UStaticMesh>(Package, *MeshName);
+	UStaticMesh* CombinedMesh = nullptr;
+
+	if (ExistingMesh)
+	{
+		CombinedMesh = ExistingMesh;
+		UE_LOG(LogTemp, Warning, TEXT("Will overwrite existing asset: %s"), *FullPath);
+	}
+	else
+	{
+		CombinedMesh = NewObject<UStaticMesh>(Package, *MeshName, RF_Public | RF_Standalone);
+		if (!CombinedMesh)
+		{
+			UE_LOG(LogTemp, Error, TEXT("Failed to create new mesh asset: %s"), *FullPath);
+			return nullptr;
+		}
+
+		CombinedMesh->AddSourceModel();
+		FAssetRegistryModule::AssetCreated(CombinedMesh);
+	}
+
+	FMeshDescription Mesh1Desc = *Mesh1->GetMeshDescription(0);
+	FMeshDescription Mesh2Desc = *Mesh2->GetMeshDescription(0);
+
+	FTransform RotateTransform(FRotator(0.f, Mesh2Rotation, 0.f));
+	FStaticMeshOperations::ApplyTransform(Mesh2Desc, RotateTransform.ToMatrixWithScale());
+	FStaticMeshOperations::FAppendSettings AppendSettings;
+	for (int32 ChannelIdx = 0; ChannelIdx < FStaticMeshOperations::FAppendSettings::MAX_NUM_UV_CHANNELS; ++ChannelIdx)
+	{
+		AppendSettings.bMergeUVChannels[ChannelIdx] = true;
+	}
+	FStaticMeshOperations::AppendMeshDescription(Mesh2Desc, Mesh1Desc, AppendSettings);
+
+	CombinedMesh->CreateMeshDescription(0, Mesh1Desc);
+	CombinedMesh->CommitMeshDescription(0);
+
+	FStaticMeshSourceModel& SourceModel = CombinedMesh->GetSourceModel(0);
+	SourceModel.BuildSettings.bRecomputeNormals = true;
+	SourceModel.BuildSettings.bRecomputeTangents = true;
+	SourceModel.BuildSettings.bUseFullPrecisionUVs = false;
+	SourceModel.BuildSettings.bGenerateLightmapUVs = true;
+
+	CombinedMesh->Build(false);
+	CombinedMesh->MarkPackageDirty();
+	
+	FAssetRegistryModule::AssetCreated(CombinedMesh);
+
+	const FString PackageFileName = FPackageName::LongPackageNameToFilename( FullPath, FPackageName::GetAssetPackageExtension());
+
+	UPackage::SavePackage(
+		Package,
+		CombinedMesh,
+		EObjectFlags::RF_Public | EObjectFlags::RF_Standalone,
+		*PackageFileName,
+		GError,
+		nullptr,
+		false,
+		true,
+		SAVE_NoError
+	);
+
+	UE_LOG(LogTemp, Log, TEXT("Successfully combined meshes into: %s"), *PackageFileName);
+	return CombinedMesh;
 }
 
 void UMeshProcessingLibrary::SaveMeshData()

@@ -375,12 +375,13 @@ protected:
 	void LogSuperpositionOptions(const TArray<FCell*>& Cells);
 	void GetMarchingBitsForCell(FCell& Cell);
 	int GetLowestEntropyCell(const TArray<FCell>& Cells);
-	bool CheckNeighbourCandidates(const FCell& Cell, FCell& NeighbourCell, const int CellBorderIndex, const int NeighbourCellBorderIndex);
+	bool CheckNeighbourCandidates(const FCell& Cell, FCell& NeighbourCell, const int CellBorderIndex, const int NeighbourCellBorderIndex, bool&
+	                              IsCellStillValid);
 
 	void ResetCells(TArray<FCell*>& Cells);
 	TArray<FCell*> GetCellsToCheck(const int Elevation, const int MarchingBitUpdated);
 	void CalculateCandidates(TArray<FCell*>& Cells);
-	void PropagateChoice(TArray<FCell>& Cells, const FCell& UpdatedCell);
+	bool PropagateChoice(TArray<FCell>& Cells, const FCell& UpdatedCell);
 	bool SolveWVC(TArray<FCell*>& OriginalCells, TArray<FCell>& CopyCells, TArray<int> CellOrder = TArray<int>());
 	void CreateCellMeshes(const TArray<FCell*>& Cells);
 	

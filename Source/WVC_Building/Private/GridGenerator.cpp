@@ -1319,8 +1319,9 @@ void AGridGenerator::CalculateCandidates(TArray<FCell*>& Cells)
 	}
 }
 
-void AGridGenerator::PropagateChoice(TArray<FCell>& Cells, const FCell& UpdatedCell)
+bool AGridGenerator::PropagateChoice(TArray<FCell>& Cells, const FCell& UpdatedCell)
 {
+	UE_LOG(LogTemp, Error, TEXT("NOW PROPAGATING: %d - %d"), UpdatedCell.Elevation, UpdatedCell.Index);
 	FString NeighboursString = "";
 	TArray<FCell*> CellsToPropagate;
 	for(int i = 0; i < UpdatedCell.Neighbours.Num(); i++)
@@ -1338,11 +1339,12 @@ void AGridGenerator::PropagateChoice(TArray<FCell>& Cells, const FCell& UpdatedC
 			continue;
 		FCell& Neighbour = Cells[CellArrayIndex];// = Elevations[UpdatedCell.Neighbours[i].Key].Cells[UpdatedCell.Neighbours[i].Value];
 		NeighboursString += TEXT("            Elevation: ") + FString::FromInt(Neighbour.Elevation) + TEXT(" - Cell:") + FString::FromInt(Neighbour.Index) + TEXT("\n");
+		bool IsNeigbhourCellStillValid = false;
 		//Bottom neighbour
 		if(Neighbour.Elevation < UpdatedCell.Elevation)
 		{
 			//Neighbour candidates were modified
-			if(CheckNeighbourCandidates(UpdatedCell, Neighbour, 0, 5))
+			if(CheckNeighbourCandidates(UpdatedCell, Neighbour, 0, 5, IsNeigbhourCellStillValid))
 			{
 				CellsToPropagate.Add(&Neighbour);
 			}
@@ -1350,7 +1352,7 @@ void AGridGenerator::PropagateChoice(TArray<FCell>& Cells, const FCell& UpdatedC
 		else if(Neighbour.Elevation > UpdatedCell.Elevation)
 		{
 			//Neighbour candidates were modified
-			if(CheckNeighbourCandidates(UpdatedCell, Neighbour, 5, 0))
+			if(CheckNeighbourCandidates(UpdatedCell, Neighbour, 5, 0, IsNeigbhourCellStillValid))
 			{
 				CellsToPropagate.Add(&Neighbour);
 			}
@@ -1364,46 +1366,57 @@ void AGridGenerator::PropagateChoice(TArray<FCell>& Cells, const FCell& UpdatedC
 			if(UpdatedCell.Neighbours[0].Key == UpdatedCell.Elevation)
 				CellToNeighbourBorderIndex++;
 			
-			if(CheckNeighbourCandidates(UpdatedCell, Neighbour, CellToNeighbourBorderIndex, NeighbourToCellBorderIndex))
+			if(CheckNeighbourCandidates(UpdatedCell, Neighbour, CellToNeighbourBorderIndex, NeighbourToCellBorderIndex, IsNeigbhourCellStillValid))
 			{
 				CellsToPropagate.Add(&Neighbour);
 			}
 		}
+
+		if(!IsNeigbhourCellStillValid)
+		{
+			UE_LOG(LogTemp, Warning, TEXT("Invalid Neighbour: Elevation: %d - Cell: %d"), Neighbour.Elevation, Neighbour.Index);
+			return false;
+		}
 	}
 
-	//UE_LOG(LogTemp, Error, TEXT("AFTER PROPAGATING CELL: Elevation: %d - Cell: %d to NEIGHBOURS: %s"), UpdatedCell.Elevation, UpdatedCell.Index, *NeighboursString);
-	//for(int i = 0; i < Cells.Num(); i++)
-	//{
-	//	bool IsNeighbour = false;
-	//	for(int j = 0; j < UpdatedCell.Neighbours.Num(); j++)
-	//	{
-	//		if(Cells[i].Elevation == UpdatedCell.Neighbours[j].Key && Cells[i].Index == UpdatedCell.Neighbours[j].Value)
-	//		{
-	//			IsNeighbour = true;
-	//			break;
-	//		}
-	//	}
-	//	if(!IsNeighbour)
-	//		continue;
-	//	
-	//	UE_LOG(LogTemp, Warning, TEXT("    Elevation: %d - Cell: %d"), Cells[i].Elevation, Cells[i].Index);
-	//	for(int j = 0; j < Cells[i].Candidates.Num(); j++)
-	//		UE_LOG(LogTemp, Log, TEXT("    Option: %s"), *Cells[i].Candidates[j].ToString());
-	//	UE_LOG(LogTemp, Warning, TEXT("    --------------------------------------"));
-	//}
+	UE_LOG(LogTemp, Error, TEXT("AFTER PROPAGATING CELL: Elevation: %d - Cell: %d to NEIGHBOURS: %s"), UpdatedCell.Elevation, UpdatedCell.Index, *NeighboursString);
+	for(int i = 0; i < Cells.Num(); i++)
+	{
+		bool IsNeighbour = false;
+		for(int j = 0; j < UpdatedCell.Neighbours.Num(); j++)
+		{
+			if(Cells[i].Elevation == UpdatedCell.Neighbours[j].Key && Cells[i].Index == UpdatedCell.Neighbours[j].Value)
+			{
+				IsNeighbour = true;
+				break;
+			}
+		}
+		if(!IsNeighbour)
+			continue;
+		
+		UE_LOG(LogTemp, Warning, TEXT("    Elevation: %d - Cell: %d"), Cells[i].Elevation, Cells[i].Index);
+		for(int j = 0; j < Cells[i].Candidates.Num(); j++)
+			UE_LOG(LogTemp, Log, TEXT("    Option: %s"), *Cells[i].Candidates[j].ToString());
+		UE_LOG(LogTemp, Warning, TEXT("    --------------------------------------"));
+	}
 	
 	for(int i = 0; i < CellsToPropagate.Num(); i++)
 	{
-	//	UE_LOG(LogTemp, Error, TEXT("NOW PROPAGATING FROM CELL: Elevation: %d - Cell: %d to NEIGHBOUR: Neighbour Elevation: %d - Neighbour Cell: %d"), UpdatedCell.Elevation, UpdatedCell.Index, CellsToPropagate[i]->Elevation, CellsToPropagate[i]->Index);
+		UE_LOG(LogTemp, Error, TEXT("NOW PROPAGATING FROM CELL: Elevation: %d - Cell: %d to NEIGHBOUR: Neighbour Elevation: %d - Neighbour Cell: %d"), UpdatedCell.Elevation, UpdatedCell.Index, CellsToPropagate[i]->Elevation, CellsToPropagate[i]->Index);
 
-		PropagateChoice(Cells, *CellsToPropagate[i]);
+		if(!PropagateChoice(Cells, *CellsToPropagate[i]))
+		{
+			return false;
+		}
 	}
+	
+	return true;
 }
 
 bool AGridGenerator::SolveWVC(TArray<FCell*>& OriginalCells, TArray<FCell>& CopyCells, TArray<int> CellOrder)
 {
 	int LowestEntropy = GetLowestEntropyCell(CopyCells);
-	//UE_LOG(LogTemp, Log, TEXT("00000000000000000000000000000000000000000000"));
+	UE_LOG(LogTemp, Log, TEXT("00000000000000000000000000000000000000000000"));
 	while(LowestEntropy != -1)
     {
     	CellOrder.Add(LowestEntropy);
@@ -1421,16 +1434,19 @@ bool AGridGenerator::SolveWVC(TArray<FCell*>& OriginalCells, TArray<FCell>& Copy
     	CopyCells[LowestEntropy].Candidates = TArray<FName>({CopyCells[LowestEntropy].ChosenCandidate});
     	CopyCells[LowestEntropy].CandidateBorders = TArray<TArray<int>>({CandidateBorders});
 
-		//UE_LOG(LogTemp, Error, TEXT("NEW CHOSEN MESH: Elevation: %d - Cell: %d WITH MESH: %s"), CopyCells[LowestEntropy].Elevation, CopyCells[LowestEntropy].Index, *CopyCells[LowestEntropy].ChosenCandidate.ToString());
-		//for(int i = 0; i < CopyCells.Num(); i++)
-		//{
-		//	UE_LOG(LogTemp, Warning, TEXT("Elevation: %d - Cell: %d"), CopyCells[i].Elevation, CopyCells[i].Index);
-		//	for(int j = 0; j < CopyCells[i].Candidates.Num(); j++)
-		//		UE_LOG(LogTemp, Log, TEXT("Option: %s"), *CopyCells[i].Candidates[j].ToString());
-		//	UE_LOG(LogTemp, Warning, TEXT("--------------------------------------"));
-		//}
+		UE_LOG(LogTemp, Error, TEXT("NEW CHOSEN MESH: Elevation: %d - Cell: %d WITH MESH: %s"), CopyCells[LowestEntropy].Elevation, CopyCells[LowestEntropy].Index, *CopyCells[LowestEntropy].ChosenCandidate.ToString());
+		for(int i = 0; i < CopyCells.Num(); i++)
+		{
+			UE_LOG(LogTemp, Warning, TEXT("Elevation: %d - Cell: %d"), CopyCells[i].Elevation, CopyCells[i].Index);
+			for(int j = 0; j < CopyCells[i].Candidates.Num(); j++)
+				UE_LOG(LogTemp, Log, TEXT("Option: %s"), *CopyCells[i].Candidates[j].ToString());
+			UE_LOG(LogTemp, Warning, TEXT("--------------------------------------"));
+		}
 		
-    	PropagateChoice(CopyCells, CopyCells[LowestEntropy]);
+    	if(!PropagateChoice(CopyCells, CopyCells[LowestEntropy]))
+    	{
+    		break;
+    	}
 		LowestEntropy = GetLowestEntropyCell(CopyCells);
     	//CopyBuildingCells[LowestEntropy]->ChosenMesh = true;
     }
@@ -1514,6 +1530,7 @@ bool AGridGenerator::SolveWVC(TArray<FCell*>& OriginalCells, TArray<FCell>& Copy
 
 	if(Retry)
 	{
+		UE_LOG(LogTemp, Warning, TEXT("Retry SOLVE WVC"));
 		return SolveWVC(OriginalCells, CopyCells, CellOrder);
 	}
 	for(int i = 0; i < OriginalCells.Num(); i++)
@@ -1601,7 +1618,7 @@ int AGridGenerator::GetLowestEntropyCell(const TArray<FCell>& Cells)
 }
 
 bool AGridGenerator::CheckNeighbourCandidates(const FCell& Cell, FCell& NeighbourCell, const int CellBorderIndex,
-	const int NeighbourCellBorderIndex)
+                                              const int NeighbourCellBorderIndex, bool& IsCellStillValid)
 {
 	bool Changed = false;
 	TArray<int> RemainingCandidates;
@@ -1633,6 +1650,11 @@ bool AGridGenerator::CheckNeighbourCandidates(const FCell& Cell, FCell& Neighbou
 		}
 	}
 
+	if(!NeighbourCell.Candidates.Num() && NeighbourCell.MarchingBits.Num() < 8)
+		IsCellStillValid = false;
+	else
+		IsCellStillValid = true;
+	
 	return Changed;
 }
 
