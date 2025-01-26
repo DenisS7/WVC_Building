@@ -69,8 +69,8 @@ void AGridGenerator::BeginPlay()
 			Elevations.Last().Cells.Add(BaseGridQuads[j].Index, FCell(i, BaseGridQuads[j].Index));
 			if(i >= 1)
 				Elevations.Last().Cells[BaseGridQuads[j].Index].Neighbours.Add(TPair<int, int>(i - 1, BaseGridQuads[j].Index));
-			for(int k = 0; k < BaseGridQuads[j].Neighbours.Num(); k++)
-				Elevations.Last().Cells[BaseGridQuads[j].Index].Neighbours.Add(TPair<int, int>(i, BaseGridQuads[j].Neighbours[k]));
+			for(int k = 0; k < BaseGridQuads[j].OffsetNeighbours.Num(); k++)
+				Elevations.Last().Cells[BaseGridQuads[j].Index].Neighbours.Add(TPair<int, int>(i, BaseGridQuads[j].OffsetNeighbours[k]));
 			if(i < MaxElevation - 1)
 				Elevations.Last().Cells[BaseGridQuads[j].Index].Neighbours.Add(TPair<int, int>(i + 1, BaseGridQuads[j].Index));
 		}
@@ -1324,9 +1324,12 @@ bool AGridGenerator::PropagateChoice(TArray<FCell>& Cells, const FCell& UpdatedC
 	UE_LOG(LogTemp, Error, TEXT("NOW PROPAGATING: %d - %d"), UpdatedCell.Elevation, UpdatedCell.Index);
 	FString NeighboursString = "";
 	TArray<FCell*> CellsToPropagate;
+	bool Valid = true;
 	for(int i = 0; i < UpdatedCell.Neighbours.Num(); i++)
 	{
 		int CellArrayIndex = -1;
+		if(UpdatedCell.Neighbours[i].Value == -1)
+			continue;
 		for(int j = 0; j < Cells.Num(); j++)
 		{
 			if(Cells[j].Elevation == UpdatedCell.Neighbours[i].Key && Cells[j].Index == UpdatedCell.Neighbours[i].Value)
@@ -1375,7 +1378,7 @@ bool AGridGenerator::PropagateChoice(TArray<FCell>& Cells, const FCell& UpdatedC
 		if(!IsNeigbhourCellStillValid)
 		{
 			UE_LOG(LogTemp, Warning, TEXT("Invalid Neighbour: Elevation: %d - Cell: %d"), Neighbour.Elevation, Neighbour.Index);
-			return false;
+			Valid = false;
 		}
 	}
 
@@ -1399,6 +1402,9 @@ bool AGridGenerator::PropagateChoice(TArray<FCell>& Cells, const FCell& UpdatedC
 			UE_LOG(LogTemp, Log, TEXT("    Option: %s"), *Cells[i].Candidates[j].ToString());
 		UE_LOG(LogTemp, Warning, TEXT("    --------------------------------------"));
 	}
+
+	if(!Valid)
+		return false;
 	
 	for(int i = 0; i < CellsToPropagate.Num(); i++)
 	{
@@ -1499,6 +1505,7 @@ bool AGridGenerator::SolveWVC(TArray<FCell*>& OriginalCells, TArray<FCell>& Copy
     				CopyCells[CellOrder[j]].DiscardedCandidates = OriginalCells[CellOrder[j]]->DiscardedCandidates;
     				CopyCells[CellOrder[j]].DiscardedCandidateBorders = OriginalCells[CellOrder[j]]->DiscardedCandidateBorders;
     				Retry = true;
+    				CellOrder.Pop();
 
     				for(int k = 0; k < CopyCells.Num(); k++)
     				{
@@ -1519,7 +1526,6 @@ bool AGridGenerator::SolveWVC(TArray<FCell*>& OriginalCells, TArray<FCell>& Copy
     					CopyCells[k].DiscardedCandidates.Empty();
     					CopyCells[k].DiscardedCandidateBorders.Empty();
     				}
-    				CellOrder.Pop();
     				
     				break;
     			}
