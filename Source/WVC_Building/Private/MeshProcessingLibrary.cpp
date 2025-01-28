@@ -8,6 +8,7 @@
 #include "StaticMeshOperations.h"
 #include "WVC_Building/Public/BuildingMeshData.h"
 #include "AssetRegistry/AssetRegistryModule.h"
+#include "Math/UnrealMathUtility.h"
 
 void UMeshProcessingLibrary::ProcessAllMeshes(UDataTable* MeshDataTable, UDataTable* OriginalMeshTable, UDataTable* VariationMeshTable, UDataTable* EdgeAdjacencyTable, const FString& FolderPath)
 {
@@ -281,6 +282,15 @@ bool UMeshProcessingLibrary::ProcessMeshData(const UStaticMesh* StaticMesh, TArr
 	SideExcludeVertices.SetNum(6);
 	for(int i = 0; i < Triangles.Num(); i++)
 	{
+		const FVector From01 = static_cast<FVector>(VertexBuffer.VertexPosition(Triangles[i][1])) - static_cast<FVector>(VertexBuffer.VertexPosition(Triangles[i][0]));
+		const FVector From02 = static_cast<FVector>(VertexBuffer.VertexPosition(Triangles[i][2])) - static_cast<FVector>(VertexBuffer.VertexPosition(Triangles[i][0]));
+		const FVector Cross = From01.Cross(From02);
+		const float SizeSquared = Cross.Size();
+		const float Tolerance = 0.01f;
+		const bool AreCollinear = SizeSquared < Tolerance;
+		if(AreCollinear)
+			continue;
+		
 		EEdgeSide CommonSide = EEdgeSide::Bottom;
 		bool HaveCommonSide = false;
 		

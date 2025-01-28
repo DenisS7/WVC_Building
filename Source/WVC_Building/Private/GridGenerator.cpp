@@ -1325,7 +1325,7 @@ void AGridGenerator::CalculateCandidates(TArray<FCell*>& Cells)
 				TArray<int> MeshBorders = TableRows[j]->EdgeCodes;
 				TArray<int> SideMeshBorders = MeshBorders;
 
-				const int Cycle = (4 - Cells[i]->RotationAmount) % 4;
+				const int Cycle = 4 - Cells[i]->RotationAmount;
 				for(int k = 1; k < 5; k++)
 				{
 					int NewIndex = k - Cycle;

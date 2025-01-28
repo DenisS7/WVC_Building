@@ -264,6 +264,9 @@ public:
 
 	UPROPERTY(EditAnywhere, Category = "Show Debug")
 	bool ShowMeshEdgeCodes = false;
+
+	UPROPERTY(EditAnywhere, Category = "Show Debug")
+	bool ShowQuadNeighbours = false;
 	
 	UPROPERTY(EditAnywhere)
 	float FirstHexSize = 50.f;

@@ -225,7 +225,7 @@ void APlayerCamera::RotatePanCamera()
 	float MouseX, MouseY;
 	GetWorld()->GetFirstPlayerController()->GetInputMouseDelta(MouseX, MouseY);
 	float Pitch = -60.f;
-	Pitch = FMath::Clamp(SpringArm->GetComponentRotation().Pitch + (MouseY * PanningSpeed), -88.99f, -30.f);
+	Pitch = FMath::Clamp(SpringArm->GetComponentRotation().Pitch + (MouseY * PanningSpeed), -88.99f, -10.f);
 
 	AddActorWorldRotation(FRotator(0.f, MouseX * RotationSpeed, 0.f));
 	SpringArm->SetWorldRotation(FRotator(Pitch, SpringArm->GetComponentRotation().Yaw, 0.f));

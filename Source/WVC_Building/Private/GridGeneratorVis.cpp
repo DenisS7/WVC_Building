@@ -141,6 +141,29 @@ FDebugRenderSceneProxy* UGridGeneratorVis::CreateDebugSceneProxy()
 				}
 			}
 		}
+
+		if(Owner->ShowQuadNeighbours)
+		{
+			const TArray<FGridQuad>& Quads = Owner->GetBaseGridQuads();
+			for(int i = 0; i < Quads.Num(); i++)
+			{
+				for(int j = 0; j < Quads[i].OffsetNeighbours.Num(); j++)
+				{
+					bool ColorCheck = false;
+					if(j >= 2)
+						ColorCheck = true;
+					if(Quads[i].OffsetNeighbours[j] == -1)
+						continue;
+					FVector ToNeighbour = Quads[Quads[i].OffsetNeighbours[j]].Center - Quads[i].Center;
+					ToNeighbour.Normalize();
+					DSceneProxy->Texts.Emplace(FString::FromInt(Quads[i].OffsetNeighbours[j]), Quads[i].Center + ToNeighbour * 50.f, Colors[j + static_cast<int>(ColorCheck)].ToFColor(true));
+
+					FVector ToCenter = Quads[i].Center - Owner->GetBasePointCoordinates(Quads[i].Points[(j + 2) % Quads[i].Points.Num()]);
+					ToCenter.Normalize();
+					DSceneProxy->Spheres.Emplace(5.f, Owner->GetBasePointCoordinates(Quads[i].Points[(j + 2) % Quads[i].Points.Num()]) - ToCenter * 15.f, Colors[j + static_cast<int>(ColorCheck)].ToFColor(true));
+				}
+			}
+		}
 	}
 	return DSceneProxy;
 }
