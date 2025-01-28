@@ -190,6 +190,7 @@ struct FCell
 	TArray<TPair<int, int>> Neighbours;
 	
 	TArray<int> MarchingBits;
+	TArray<int> InitialMarchingBits;
 
 	FCell() {}
 	
@@ -236,6 +237,9 @@ class WVC_BUILDING_API AGridGenerator : public AActor
 public:	
 	UPROPERTY(EditAnywhere, Category = "Show Debug")
 	bool Debug = false;
+
+	UPROPERTY(EditAnywhere, Category = "Show Debug")
+	bool ShowMarchingBits = false;
 	
 	UPROPERTY(EditAnywhere, Category = "Show Debug")
 	bool ShowBaseGrid = true;
@@ -340,6 +344,7 @@ public:
 	const TArray<FGridQuad>& GetBaseGridQuads() const { return BaseGridQuads; }
 	const TArray<FGridShape>& GetBuildingGridShapes() const { return BuildingGridShapes; }
 	const FElevationData& GetElevationData(const int& Level) const { return Elevations[Level]; }
+	const TArray<FElevationData>& GetElevations() const { return Elevations; }
 	void RunWVC(const int Elevation, const int MarchingBitUpdated);
 	
 	UFUNCTION(BlueprintCallable, Category = "GridGenerator")

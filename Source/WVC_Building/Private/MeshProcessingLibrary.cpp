@@ -9,7 +9,7 @@
 #include "WVC_Building/Public/BuildingMeshData.h"
 #include "AssetRegistry/AssetRegistryModule.h"
 
-void UMeshProcessingLibrary::ProcessAllMeshes(UDataTable* MeshDataTable, UDataTable* VariationMeshTable, UDataTable* EdgeAdjacencyTable, const FString& FolderPath)
+void UMeshProcessingLibrary::ProcessAllMeshes(UDataTable* MeshDataTable, UDataTable* OriginalMeshTable, UDataTable* VariationMeshTable, UDataTable* EdgeAdjacencyTable, const FString& FolderPath)
 {
 	TMap<TArray<FIntVector>, TArray<FIntVector>> EdgeVariations;
 	TMap<TArray<FIntVector>, int> EdgeCodes;
@@ -50,6 +50,12 @@ void UMeshProcessingLibrary::ProcessAllMeshes(UDataTable* MeshDataTable, UDataTa
 				{
 					MeshData.Corners = VariationRow->Corners;
 				}
+
+				if(FBuildingMeshData* OriginalRow = OriginalMeshTable->FindRow<FBuildingMeshData>(MeshName, TEXT("ProcessAllMeshes")))
+				{
+					MeshData.Corners = OriginalRow->Corners;
+				}
+				
 				MeshDataTable->AddRow(MeshName, MeshData);
 			}
 		}
@@ -61,6 +67,8 @@ void UMeshProcessingLibrary::ProcessAllMeshes(UDataTable* MeshDataTable, UDataTa
 		FEdgeAdjacencyData EdgeAdjacencyData;
 		EdgeAdjacencyData.EdgeCode = EdgeAdjacency.Key;
 		EdgeAdjacencyData.CorrespondingEdgeCode = EdgeAdjacency.Value;
+		EdgeAdjacencyData.EdgePoints = *EdgeCodes.FindKey(EdgeAdjacency.Key);
+		EdgeAdjacencyData.CorrespondingEdgePoints = *EdgeCodes.FindKey(EdgeAdjacency.Value);
 		EdgeAdjacencyTable->AddRow(FName(*FString::FromInt(EdgeAdjacency.Key)), EdgeAdjacencyData);
 	}
 
@@ -576,11 +584,25 @@ void UMeshProcessingLibrary::CreateAdditionalMeshes(const FBuildingMeshData* Row
 		for(int j = 0; j < Row1->Corners.Num(); j++)
 		{
 			int VerticalAdjacentBit = -1;
+			int NextAdjacentBit = -1;
+			int PreviousAdjacentBit = -1;
 			if(Row1->Corners[j] < 4)
+			{
 				VerticalAdjacentBit = Row1->Corners[j] + 4;
+				NextAdjacentBit = (Row1->Corners[j] + 1) % 4;
+				PreviousAdjacentBit = Row1->Corners[j] - 1;
+				if(PreviousAdjacentBit < 0)
+					PreviousAdjacentBit += 4;
+			}
 			else
+			{
 				VerticalAdjacentBit = Row1->Corners[j] - 4;
-			if(Row2Set.Contains(VerticalAdjacentBit))
+				NextAdjacentBit = (Row1->Corners[j] + 1) % 4 + 4;
+				PreviousAdjacentBit = Row1->Corners[j] - 1;
+				if(PreviousAdjacentBit < 4)
+					PreviousAdjacentBit += 4;
+			}
+			if(Row2Set.Contains(VerticalAdjacentBit) || Row2Set.Contains(NextAdjacentBit) || Row2Set.Contains(PreviousAdjacentBit))
 			{
 				ValidCombination = false;
 				break;
@@ -616,7 +638,7 @@ void UMeshProcessingLibrary::CreateAdditionalMeshes(const FBuildingMeshData* Row
 UStaticMesh* UMeshProcessingLibrary::CombineMeshes(const UStaticMesh* Mesh1, const UStaticMesh* Mesh2,
                                                    const float Mesh2Rotation)
 {
-	const FString PackagePath = TEXT("/Game/Assets/Meshes/AllMeshes");
+	const FString PackagePath = TEXT("/Game/Assets/Meshes/GeneratedMeshes");
 	const FString MeshName   = FString::Printf(TEXT("%s_%s_%d"), *Mesh1->GetName(), *Mesh2->GetName(), FMath::Abs(static_cast<int>(Mesh2Rotation)));
 	const FString FullPath = PackagePath / MeshName;
 

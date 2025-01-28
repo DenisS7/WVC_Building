@@ -12,4 +12,10 @@ struct WVC_BUILDING_API FEdgeAdjacencyData : public FTableRowBase
 	
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "EdgeAdjacencyData")
 	int CorrespondingEdgeCode = -1;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "EdgeAdjacencyData")
+	TArray<FIntVector> EdgePoints;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "EdgeAdjacencyData")
+	TArray<FIntVector> CorrespondingEdgePoints;
 };

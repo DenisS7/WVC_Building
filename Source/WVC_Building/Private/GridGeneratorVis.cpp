@@ -126,6 +126,21 @@ FDebugRenderSceneProxy* UGridGeneratorVis::CreateDebugSceneProxy()
 				DSceneProxy->Texts.Emplace(FString::FromInt(SecondGrid[i].Index), SecondGrid[i].Center, Colors[2].ToFColor(true));
 			}
 		}
+
+		if(Owner->ShowMarchingBits)
+		{
+			const TArray<FElevationData>& Elevations = Owner->GetElevations();
+			for(int i = 0; i < Elevations.Num(); i++)
+			{
+				for(int j = 0; j < Elevations[i].MarchingBits.Num(); j++)
+				{
+					if(Elevations[i].MarchingBits[j])
+					{
+						DSceneProxy->Spheres.Emplace(5.f, Owner->GetBaseGridPoints()[j].Location + FVector(0.f, 0.f, 200.f * static_cast<float>(i)), FLinearColor::Green);
+					}
+				}
+			}
+		}
 	}
 	return DSceneProxy;
 }

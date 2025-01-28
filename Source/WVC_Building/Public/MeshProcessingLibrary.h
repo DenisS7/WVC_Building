@@ -27,7 +27,7 @@ class WVC_BUILDING_API UMeshProcessingLibrary : public UBlueprintFunctionLibrary
 	GENERATED_BODY()
 public:
 	UFUNCTION(BlueprintCallable, Category = "MeshDataLibrary")
-    static void ProcessAllMeshes(UDataTable* MeshDataTable, UDataTable* VariationMeshTable, UDataTable* EdgeAdjacencyTable, const FString& FolderPath);
+    static void ProcessAllMeshes(UDataTable* AllMeshDataTable, UDataTable* OriginalMeshTable, UDataTable* VariationMeshTable, UDataTable* EdgeAdjacencyTable, const FString& FolderPath);
 
 	UFUNCTION(BlueprintCallable, Category = "MeshDataLibrary")
 	static void CreateRotationMeshes(UDataTable* OriginalMeshTable, UDataTable* VariationMeshTable);

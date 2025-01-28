@@ -94,6 +94,16 @@ void AGridGenerator::OnConstruction(const FTransform& Transform)
 void AGridGenerator::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
+	for(int i = 0; i < Elevations.Num(); i++)
+	{
+		for(int j = 0; j < Elevations[i].MarchingBits.Num(); j++)
+		{
+			if(Elevations[i].MarchingBits[j])
+			{
+				DrawDebugSphere(GetWorld(), GetBaseGridPoints()[j].Location + FVector(0.f, 0.f, 200.f * static_cast<float>(i)), 5.f, 4, FColor::Green, false, 0.1f);
+			}
+		}
+	}
 }
 
 void AGridGenerator::GenerateGrid()
@@ -1036,14 +1046,22 @@ void AGridGenerator::ReorderQuadNeighbours()
 void AGridGenerator::LogSuperpositionOptions(const FCell& Cell)
 {
 	FString MarchingString = "";
+	FString InitialMarchingString = "";
+	
 	for(int i = 0; i < Cell.MarchingBits.Num(); i++)
 	{
+		InitialMarchingString += FString::FromInt(Cell.InitialMarchingBits[i]) + ", ";
 		MarchingString += FString::FromInt(Cell.MarchingBits[i]);
 		MarchingString += ", ";
 	}
-	UE_LOG(LogTemp, Error, TEXT("Elevation: %d - Cell: %d - Marching Bits: %s"), Cell.Elevation, Cell.Index, *MarchingString);
+	UE_LOG(LogTemp, Error, TEXT("Elevation: %d - Cell: %d - Marching Bits: %s (Initial Bits: %s) - Rotation: %f"), Cell.Elevation, Cell.Index, *MarchingString, *InitialMarchingString, static_cast<float>(Cell.RotationAmount) * 90.f);
 	for(int i = 0; i < Cell.Candidates.Num(); i++)
-		UE_LOG(LogTemp, Warning, TEXT("Option: %s"), *Cell.Candidates[i].ToString());
+	{
+		FString BorderString = "";
+		for(int j = 0; j < Cell.CandidateBorders[i].Num(); j++)
+			BorderString += FString::FromInt(Cell.CandidateBorders[i][j]) + ", ";
+		UE_LOG(LogTemp, Warning, TEXT("Option: %s - Border: %s"), *Cell.Candidates[i].ToString(), *BorderString);
+	}
 	UE_LOG(LogTemp, Warning, TEXT("--------------------------------------"));
 
 }
@@ -1074,7 +1092,8 @@ void AGridGenerator::GetMarchingBitsForCell(FCell& Cell)
 				MinCorner = j;
 		}
 	}
-
+	Cell.InitialMarchingBits = LowerCorners;
+	Cell.InitialMarchingBits.Append(UpperCorners);
 	Cell.RotationAmount = 0;
 	
 	if(LowerCorners.Num())
@@ -1147,7 +1166,7 @@ void AGridGenerator::GetMarchingBitsForCell(FCell& Cell)
 		}
 		if(UpperCorners[0] != 4)
 		{
-			const int RotationAmount = 7 - UpperCorners[0];
+			const int RotationAmount = 8 - UpperCorners[0];
 			Cell.RotationAmount = RotationAmount;
 			for(int j = 0; j < UpperCorners.Num(); j++)
 			{
@@ -1184,7 +1203,7 @@ TArray<FCell*> AGridGenerator::GetCellsToCheck(const int Elevation, const int Ma
 		for(int i = 0; i < CurrentCellsPoints.Num(); i++)
 		{
 			//Add neighbours containing that point (if they're valid)
-			if(Elevations[CurrentCell->Elevation].MarchingBits[CurrentCellsPoints[i]])
+			if(Elevations[CurrentCell->Elevation].MarchingBits[CurrentCellsPoints[i]] || Elevations[CurrentCell->Elevation + 1].MarchingBits[CurrentCellsPoints[i]])
 			{
 				BuildingCells.AddUnique(CurrentCell);
 				BuildingCells.Last()->HasChosenCandidate = false;
@@ -1214,21 +1233,21 @@ TArray<FCell*> AGridGenerator::GetCellsToCheck(const int Elevation, const int Ma
 		}
 
 		//Add above and bellow cells
-		const int Bellow = CurrentCell->Elevation - 1;
+		const int Below = CurrentCell->Elevation - 1;
 		const int AboveElevation = CurrentCell->Elevation + 1;
 		// might break if there are upper marching bits and no lower ones
-		if(Bellow >= 0 && Bellow < MaxElevation - 1)
+		if(Below >= 0 && Below < MaxElevation - 1)
 		{
-			FCell* BelowCell = &Elevations[Bellow].Cells[CurrentCell->Index];
+			FCell* BelowCell = &Elevations[Below].Cells[CurrentCell->Index];
 			for(int i = 0; i < CurrentCellsPoints.Num(); i++)
 			{
-				if(Elevations[CurrentCell->Elevation].MarchingBits[CurrentCellsPoints[i]])
+				if(Elevations[Below].MarchingBits[CurrentCellsPoints[i]])
 				{
 					if(!CheckedCells.Contains(BelowCell))
 						CellsToCheck.AddUnique(BelowCell);
 					break;
 				}
-				if(Elevations[CurrentCell->Elevation + 1].MarchingBits[CurrentCellsPoints[i]])
+				if(Elevations[Below + 1].MarchingBits[CurrentCellsPoints[i]])
 				{
 					if(!CheckedCells.Contains(BelowCell))
 						CellsToCheck.AddUnique(BelowCell);
@@ -1326,7 +1345,7 @@ void AGridGenerator::CalculateCandidates(TArray<FCell*>& Cells)
 bool AGridGenerator::PropagateChoice(TArray<FCell>& Cells, const FCell& UpdatedCell)
 {
 	UE_LOG(LogTemp, Error, TEXT("NOW PROPAGATING: %d - %d"), UpdatedCell.Elevation, UpdatedCell.Index);
-	FString NeighboursString = "";
+	FString NeighboursString = "\n";
 	TArray<FCell*> CellsToPropagate;
 	bool Valid = true;
 	for(int i = 0; i < UpdatedCell.Neighbours.Num(); i++)
@@ -1345,12 +1364,15 @@ bool AGridGenerator::PropagateChoice(TArray<FCell>& Cells, const FCell& UpdatedC
 		if(CellArrayIndex == -1)
 			continue;
 		FCell& Neighbour = Cells[CellArrayIndex];// = Elevations[UpdatedCell.Neighbours[i].Key].Cells[UpdatedCell.Neighbours[i].Value];
-		NeighboursString += TEXT("            Elevation: ") + FString::FromInt(Neighbour.Elevation) + TEXT(" - Cell:") + FString::FromInt(Neighbour.Index) + TEXT("\n");
 		bool IsNeigbhourCellStillValid = false;
 		//Bottom neighbour
+		int NeighbourToCellBorderIndex = Neighbour.Neighbours.Find(TPair<int, int>(UpdatedCell.Elevation, UpdatedCell.Index));
+		int CellToNeighbourBorderIndex = i;
 		if(Neighbour.Elevation < UpdatedCell.Elevation)
 		{
 			//Neighbour candidates were modified
+			NeighbourToCellBorderIndex = 5;
+			CellToNeighbourBorderIndex = 0;
 			if(CheckNeighbourCandidates(UpdatedCell, Neighbour, 0, 5, IsNeigbhourCellStillValid))
 			{
 				CellsToPropagate.Add(&Neighbour);
@@ -1358,6 +1380,8 @@ bool AGridGenerator::PropagateChoice(TArray<FCell>& Cells, const FCell& UpdatedC
 		}
 		else if(Neighbour.Elevation > UpdatedCell.Elevation)
 		{
+			NeighbourToCellBorderIndex = 0;
+			CellToNeighbourBorderIndex = 5;
 			//Neighbour candidates were modified
 			if(CheckNeighbourCandidates(UpdatedCell, Neighbour, 5, 0, IsNeigbhourCellStillValid))
 			{
@@ -1366,8 +1390,6 @@ bool AGridGenerator::PropagateChoice(TArray<FCell>& Cells, const FCell& UpdatedC
 		}
 		else
 		{
-			int NeighbourToCellBorderIndex = Neighbour.Neighbours.Find(TPair<int, int>(UpdatedCell.Elevation, UpdatedCell.Index));
-			int CellToNeighbourBorderIndex = i;
 			if(Neighbour.Neighbours[0].Key == UpdatedCell.Elevation)
 				NeighbourToCellBorderIndex++;
 			if(UpdatedCell.Neighbours[0].Key == UpdatedCell.Elevation)
@@ -1378,6 +1400,7 @@ bool AGridGenerator::PropagateChoice(TArray<FCell>& Cells, const FCell& UpdatedC
 				CellsToPropagate.Add(&Neighbour);
 			}
 		}
+		NeighboursString += TEXT("            Elevation: ") + FString::FromInt(Neighbour.Elevation) + TEXT(" - Cell: ") + FString::FromInt(Neighbour.Index) + " - Cell To N: " + FString::FromInt(CellToNeighbourBorderIndex) + " - N to Cell: " + FString::FromInt(NeighbourToCellBorderIndex) + TEXT("\n");
 
 		if(!IsNeigbhourCellStillValid)
 		{
@@ -2004,11 +2027,20 @@ void AGridGenerator::DrawSecondGrid()
 void AGridGenerator::UpdateMarchingBit(const int ElevationLevel, const int Index, const bool Value, const bool IsAdjacent)
 {
 	int ActualElevationLevel = ElevationLevel;
-	if(ElevationLevel == 0 || IsAdjacent)
+	if(ElevationLevel == 0)
+	{
+		Elevations[ActualElevationLevel + 1].MarchingBits[Index] = Value;
+		Elevations[ActualElevationLevel].MarchingBits[Index] = Value;
+	}
+	else if(IsAdjacent)
 	{
 		Elevations[ActualElevationLevel + 1].MarchingBits[Index] = Value;
 	}
-	Elevations[ActualElevationLevel].MarchingBits[Index] = Value;
+	else
+	{
+		Elevations[ActualElevationLevel].MarchingBits[Index] = Value;
+	}
+	
 	RunWVC(ActualElevationLevel, Index);
 	for(int i = 0; i < BaseGridPoints[Index].PartOfQuads.Num(); i++)
 	{
