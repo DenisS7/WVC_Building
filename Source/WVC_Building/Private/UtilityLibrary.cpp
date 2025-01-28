@@ -77,7 +77,7 @@ bool UtilityLibrary::GetGridAndBuildingMouseIsHoveringOver(const UWorld* World, 
 				//UE_LOG(LogTemp, Warning, TEXT("BOTTOM MeshBounds: %s, HitBuildingElevation: %d"), *MeshBounds.GetBox().GetExtent().ToString(), HitBuildingElevation);
 				return true;
 			}
-			if(HitResult.Location.Z > static_cast<float>(AdjacentHitBuildingElevation) * 200.f + 2.f * MeshBounds.GetBox().GetExtent().Z - 10.f
+			if(HitResult.Location.Z > static_cast<float>(AdjacentHitBuildingElevation) * 200.f + MeshBounds.Origin.Z + MeshBounds.GetBox().GetExtent().Z - 10.f
 				|| !Grid->GetElevationData(AdjacentHitBuildingElevation + 1).MarchingBits[Grid->GetBuildingGridShapes()[HitBuildingIndex].CorrespondingBaseGridPoint])
 			{
 				++AdjacentHitBuildingElevation;
