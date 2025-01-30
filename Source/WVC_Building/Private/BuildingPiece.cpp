@@ -19,6 +19,7 @@ ABuildingPiece::ABuildingPiece()
 	MeshDeformerComponent->ProceduralMeshComp = ProceduralMeshComponent;
 	MarchingCorners.Init(false, 8);
 	ProceduralMeshComponent->SetupAttachment(StaticMeshComponent);
+	ProceduralMeshComponent->SetMaterial(0, MeshMaterial);
 }
 
 // Called when the game starts or when spawned

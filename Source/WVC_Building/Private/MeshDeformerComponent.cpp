@@ -3,6 +3,7 @@
 #include "MeshDeformerComponent.h"
 
 #include "AudioMixerBlueprintLibrary.h"
+#include "KismetProceduralMeshLibrary.h"
 #include "ProceduralMeshComponent.h"
 #include "VectorTypes.h"
 #include "Engine/StaticMesh.h"
@@ -280,10 +281,58 @@ void UMeshDeformerComponent::DeformMesh(const TArray<UE::Math::TVector<double>>&
             //DrawDebugLine(GetWorld(), CageVertices[CageFaces[i][j]], CageVertices[CageFaces[i][(j + 1) % CageFaces[i].Num()]], Colors[i], false, 100.f, 0, 2.f);
         }
     }
+    
     for(int i = 0; i < OriginalVertices.Num(); i++)
     {
         CurrentPointIndex = i;
         DeformedVertices.Add(ComputeSMVCCoordinate(OriginalVertices[i]));
     }
-    ProceduralMeshComp->CreateMeshSection(0, DeformedVertices, Triangles, Normals, UVs, TArray<FColor>(), Tangents, true);
+
+    TArray<FVector> NewNormals;
+    NewNormals.Init(FVector::ZeroVector, DeformedVertices.Num());
+    
+    for(int32 i = 0; i < Triangles.Num(); i += 3)
+    {
+        const int32 Idx0 = Triangles[i];
+        const int32 Idx1 = Triangles[i+1];
+        const int32 Idx2 = Triangles[i+2];
+        
+        const FVector A = DeformedVertices[Idx0];
+        const FVector B = DeformedVertices[Idx1];
+        const FVector C = DeformedVertices[Idx2];
+        
+        FVector FaceNormal = FVector::CrossProduct(B - A, C - A);
+        if(FaceNormal.SizeSquared() < KINDA_SMALL_NUMBER)
+        {
+            FaceNormal = FVector(0,0,1);
+        }
+        FaceNormal.Normalize();
+        
+        NewNormals[Idx0] += FaceNormal;
+        NewNormals[Idx1] += FaceNormal;
+        NewNormals[Idx2] += FaceNormal;
+    }
+
+    for(FVector& Normal : NewNormals)
+    {
+        if(Normal.SizeSquared() > KINDA_SMALL_NUMBER)
+        {
+            Normal.Normalize();
+        }
+        else
+        {
+            Normal = FVector(0,0,1);
+        }
+    }
+
+    TArray<FProcMeshTangent> NewTangents;
+    UKismetProceduralMeshLibrary::CalculateTangentsForMesh(
+        DeformedVertices,
+        Triangles,
+        UVs,
+        NewNormals,
+        NewTangents
+    );
+    
+    ProceduralMeshComp->CreateMeshSection(0, DeformedVertices, Triangles, NewNormals, UVs, TArray<FColor>(), NewTangents, true);
 }

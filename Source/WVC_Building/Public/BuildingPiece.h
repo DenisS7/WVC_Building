@@ -61,6 +61,9 @@ protected:
 	
 	UPROPERTY(EditAnywhere)
 	UMeshDeformerComponent* MeshDeformerComponent = nullptr;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Materials")
+	UMaterialInterface* MeshMaterial;
 
 	UPROPERTY(BlueprintReadWrite)
 	float MeshRotation = 0.f;
