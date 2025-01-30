@@ -382,7 +382,7 @@ protected:
 	void LogSuperpositionOptions(const FCell& Cell);
 	void LogSuperpositionOptions(const TArray<FCell*>& Cells);
 	void GetMarchingBitsForCell(FCell& Cell);
-	int GetLowestEntropyCell(const TArray<FCell>& Cells);
+	int GetLowestEntropyCell(const TArray<FCell>& Cells, int& HighestPriorityCandidate);
 	bool CheckNeighbourCandidates(const FCell& Cell, FCell& NeighbourCell, const int CellBorderIndex, const int NeighbourCellBorderIndex, bool&
 	                              IsCellStillValid);
 

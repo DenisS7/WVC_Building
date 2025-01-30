@@ -5,6 +5,8 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 #include "EdgeAdjacencyData.h"
+#include "IPropertyTable.h"
+#include "MaterialDomain.h"
 #include "StaticMeshOperations.h"
 #include "WVC_Building/Public/BuildingMeshData.h"
 #include "AssetRegistry/AssetRegistryModule.h"
@@ -50,11 +52,13 @@ void UMeshProcessingLibrary::ProcessAllMeshes(UDataTable* MeshDataTable, UDataTa
 				if(FBuildingMeshData* VariationRow = VariationMeshTable->FindRow<FBuildingMeshData>(MeshName, TEXT("ProcessAllMeshes")))
 				{
 					MeshData.Corners = VariationRow->Corners;
+					MeshData.Priority = VariationRow->Priority;
 				}
 
 				if(FBuildingMeshData* OriginalRow = OriginalMeshTable->FindRow<FBuildingMeshData>(MeshName, TEXT("ProcessAllMeshes")))
 				{
 					MeshData.Corners = OriginalRow->Corners;
+					MeshData.Priority = OriginalRow->Priority;
 				}
 				
 				MeshDataTable->AddRow(MeshName, MeshData);
@@ -88,9 +92,9 @@ void UMeshProcessingLibrary::CreateRotationMeshes(UDataTable* OriginalMeshTable,
 	TArray<FBuildingMeshData*> TableRows;
 	OriginalMeshTable->GetAllRows<FBuildingMeshData>(TEXT("ProcessAllMeshes"), TableRows);
 
-	for(int i = 0; i < TableRows.Num() - 1; i++)
+	for(int i = 0; i < TableRows.Num(); i++)
 	{
-		for(int j = 0; j < TableRows.Num(); j++)
+		for(int j = i; j < TableRows.Num(); j++)
 		{
 			CreateAdditionalMeshes(TableRows[i], TableRows[j], VariationMeshTable);
 		}
@@ -103,6 +107,117 @@ void UMeshProcessingLibrary::CreateRotationMeshes(UDataTable* OriginalMeshTable,
 
 void UMeshProcessingLibrary::GetMeshData(const FName& MeshName)
 {
+}
+
+void UMeshProcessingLibrary::NormalizeMarchingBits(TArray<int>& MarchingBits, int& RotationNeeded)
+{
+	TArray<int> LowerCorners;
+	TArray<int> UpperCorners;
+
+	for(int i = 0; i < MarchingBits.Num(); i++)
+	{
+		if(MarchingBits[i] < 4)
+			LowerCorners.Add(MarchingBits[i]);
+		else
+			UpperCorners.Add(MarchingBits[i]);
+	}
+
+	LowerCorners.Sort();
+	UpperCorners.Sort();
+	
+	if(LowerCorners.Num())
+	{
+		//Arranging so the first lower corner is the least number
+		if(LowerCorners.Num() >= 2)
+		{
+			for(int j = 0; j < LowerCorners.Num() - 1; j++)
+			{
+				if(LowerCorners[j] != LowerCorners[j + 1] - 1)
+				{
+					for(int p = 0; p < LowerCorners.Num() - j - 1; p++)
+					{
+						const int LastElement = LowerCorners.Last();
+						for(int k = LowerCorners.Num() - 1; k >= 1; k--)
+						{
+							LowerCorners[k] = LowerCorners[k - 1];
+						}
+						LowerCorners[0] = LastElement;
+						
+						if(UpperCorners.Num() >= 2)
+						{
+							const int UpperLastElement = UpperCorners.Last();
+							for(int k = UpperCorners.Num() - 1; k >= 1; k--)
+							{
+								UpperCorners[k] = UpperCorners[k - 1];
+							}
+							UpperCorners[0] = UpperLastElement;
+						}
+					}
+					break;
+				}
+			}
+		}
+		if(LowerCorners[0] != 0)
+		{
+			const int RotationAmount = 4 - LowerCorners[0];
+			RotationNeeded = RotationAmount;
+			for(int j = 0; j < LowerCorners.Num(); j++)
+			{
+				LowerCorners[j] = (LowerCorners[j] + RotationAmount) % 4;
+			}
+			
+			for(int j = 0; j < UpperCorners.Num(); j++)
+			{
+				UpperCorners[j] = (UpperCorners[j] + RotationAmount) % 4 + 4;
+			}
+		}
+	}
+	if(UpperCorners.Num() && (!LowerCorners.Num() || LowerCorners.Num() == 4))
+	{
+		if(UpperCorners.Num() >= 2)
+		{
+			for(int j = 0; j < UpperCorners.Num() - 1; j++)
+			{
+				if(UpperCorners[j] != UpperCorners[j + 1] - 1)
+				{
+					for(int p = 0; p < UpperCorners.Num() - j - 1; p++)
+					{
+						const int LastElement = UpperCorners.Last();
+						for(int k = UpperCorners.Num() - 1; k >= 1; k--)
+						{
+							UpperCorners[k] = UpperCorners[k - 1];
+						}
+						UpperCorners[0] = LastElement;
+					}
+					break;
+				}
+			}
+		}
+		if(UpperCorners[0] != 4)
+		{
+			const int RotationAmount = 8 - UpperCorners[0];
+			RotationNeeded = RotationAmount;
+			for(int j = 0; j < UpperCorners.Num(); j++)
+			{
+				UpperCorners[j] = (UpperCorners[j] + RotationAmount) % 4 + 4;
+			}
+		}
+	}
+	MarchingBits = LowerCorners;
+	MarchingBits.Append(UpperCorners);
+}
+
+void UMeshProcessingLibrary::ClearDataTable(UDataTable* DataTable)
+{
+	if (!DataTable)
+	{
+		return;
+	}
+	
+	DataTable->Modify();
+	DataTable->EmptyTable();
+	DataTable->MarkPackageDirty();
+	DataTable->PostEditChange();
 }
 
 TArray<int> UMeshProcessingLibrary::RotateMarchingBits(const TArray<int>& MarchingBits, const int Rotation)
@@ -622,21 +737,26 @@ void UMeshProcessingLibrary::CreateAdditionalMeshes(const FBuildingMeshData* Row
 		if(!ValidCombination)
 			continue;
 
+		int RotationNeeded = 0;
+		TArray<int> CombinedMarchingBits = Row1->Corners;
+		CombinedMarchingBits.Append(RotatedMesh2Bits);
+		NormalizeMarchingBits(CombinedMarchingBits, RotationNeeded);
 
-		UStaticMesh* CombinedMesh = CombineMeshes(Row1->StaticMesh, Row2->StaticMesh, -static_cast<float>(i + 1) * 90.f);
+		UStaticMesh* CombinedMesh = CombineMeshes(Row1->StaticMesh, Row2->StaticMesh, -static_cast<float>(i + 1) * 90.f, -static_cast<float>(RotationNeeded) * 90.f);
 		if(!CombinedMesh)
 			continue;
 
 		FBuildingMeshData CombinedMeshData;
 		CombinedMeshData.Name = *CombinedMesh->GetName();
 		CombinedMeshData.StaticMesh = CombinedMesh;
-		CombinedMeshData.Corners = Row1->Corners;
-		CombinedMeshData.Corners.Append(RotatedMesh2Bits);
+		CombinedMeshData.Corners = CombinedMarchingBits;
+		CombinedMeshData.Priority = FMath::Min(Row1->Priority, Row2->Priority);
 		FBuildingMeshData* ExistingRow = VariationMeshTable->FindRow<FBuildingMeshData>(*CombinedMesh->GetName(), TEXT("Create Additional Meshes"));
 		if(ExistingRow)
 		{
 			ExistingRow->StaticMesh = CombinedMesh;
 			ExistingRow->Corners = CombinedMeshData.Corners;
+			ExistingRow->Priority = CombinedMeshData.Priority;
 		}
 		else
 		{
@@ -646,10 +766,10 @@ void UMeshProcessingLibrary::CreateAdditionalMeshes(const FBuildingMeshData* Row
 }
 
 UStaticMesh* UMeshProcessingLibrary::CombineMeshes(const UStaticMesh* Mesh1, const UStaticMesh* Mesh2,
-                                                   const float Mesh2Rotation)
+                                                   const float SpecificMesh2Rotation, const float BothMeshRotation)
 {
 	const FString PackagePath = TEXT("/Game/Assets/Meshes/GeneratedMeshes");
-	const FString MeshName   = FString::Printf(TEXT("%s_%s_%d"), *Mesh1->GetName(), *Mesh2->GetName(), FMath::Abs(static_cast<int>(Mesh2Rotation)));
+	const FString MeshName   = FString::Printf(TEXT("%s_%s_%d"), *Mesh1->GetName(), *Mesh2->GetName(), FMath::Abs(static_cast<int>(SpecificMesh2Rotation)));
 	const FString FullPath = PackagePath / MeshName;
 
 	UPackage* Package = CreatePackage(*FullPath);
@@ -680,18 +800,31 @@ UStaticMesh* UMeshProcessingLibrary::CombineMeshes(const UStaticMesh* Mesh1, con
 		FAssetRegistryModule::AssetCreated(CombinedMesh);
 	}
 
+	if (CombinedMesh->GetStaticMaterials().Num() == 0)
+	{
+		// Retrieve the engine’s default material for opaque surfaces:
+		UMaterialInterface* DefaultMat = UMaterial::GetDefaultMaterial(EMaterialDomain::MD_Surface);
+
+		// Add it as a single material slot:
+		CombinedMesh->GetStaticMaterials().Add(FStaticMaterial(DefaultMat));
+	}
+
 	FMeshDescription Mesh1Desc = *Mesh1->GetMeshDescription(0);
 	FMeshDescription Mesh2Desc = *Mesh2->GetMeshDescription(0);
 
-	FTransform RotateTransform(FRotator(0.f, Mesh2Rotation, 0.f));
-	FStaticMeshOperations::ApplyTransform(Mesh2Desc, RotateTransform.ToMatrixWithScale());
+	FTransform Mesh1RotateTransform(FRotator(0.f, BothMeshRotation, 0.f));
+	FTransform Mesh2RotateTransform(FRotator(0.f, SpecificMesh2Rotation + BothMeshRotation, 0.f));
+	FStaticMeshOperations::ApplyTransform(Mesh1Desc, Mesh1RotateTransform.ToMatrixWithScale());
+	FStaticMeshOperations::ApplyTransform(Mesh2Desc, Mesh2RotateTransform.ToMatrixWithScale());
 	FStaticMeshOperations::FAppendSettings AppendSettings;
 	for (int32 ChannelIdx = 0; ChannelIdx < FStaticMeshOperations::FAppendSettings::MAX_NUM_UV_CHANNELS; ++ChannelIdx)
 	{
 		AppendSettings.bMergeUVChannels[ChannelIdx] = true;
 	}
+
 	FStaticMeshOperations::AppendMeshDescription(Mesh2Desc, Mesh1Desc, AppendSettings);
 
+	CombinedMesh->ClearMeshDescriptions();
 	CombinedMesh->CreateMeshDescription(0, Mesh1Desc);
 	CombinedMesh->CommitMeshDescription(0);
 
@@ -722,8 +855,4 @@ UStaticMesh* UMeshProcessingLibrary::CombineMeshes(const UStaticMesh* Mesh1, con
 
 	UE_LOG(LogTemp, Log, TEXT("Successfully combined meshes into: %s"), *PackageFileName);
 	return CombinedMesh;
-}
-
-void UMeshProcessingLibrary::SaveMeshData()
-{
 }

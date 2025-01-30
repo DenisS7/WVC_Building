@@ -8,6 +8,7 @@
 #include "DebugStrings.h"
 #include "EdgeAdjacencyData.h"
 #include "GridGeneratorVis.h"
+#include "MeshProcessingLibrary.h"
 #include "Polygon2.h"
 #include "Components/DynamicMeshComponent.h"
 #include "GeometryScript/MeshPrimitiveFunctions.h"
@@ -1094,89 +1095,92 @@ void AGridGenerator::GetMarchingBitsForCell(FCell& Cell)
 	}
 	Cell.InitialMarchingBits = LowerCorners;
 	Cell.InitialMarchingBits.Append(UpperCorners);
+	Cell.MarchingBits = Cell.InitialMarchingBits;
 	Cell.RotationAmount = 0;
-	
-	if(LowerCorners.Num())
-	{
-		//Arranging so the first lower corner is the least number
-		if(LowerCorners.Num() >= 2)
-		{
-			for(int j = 0; j < LowerCorners.Num() - 1; j++)
-			{
-				if(LowerCorners[j] != LowerCorners[j + 1] - 1)
-				{
-					for(int p = 0; p < LowerCorners.Num() - j - 1; p++)
-					{
-						const int LastElement = LowerCorners.Last();
-						for(int k = LowerCorners.Num() - 1; k >= 1; k--)
-						{
-							LowerCorners[k] = LowerCorners[k - 1];
-						}
-						LowerCorners[0] = LastElement;
-						
-						if(UpperCorners.Num() >= 2)
-						{
-							const int UpperLastElement = UpperCorners.Last();
-							for(int k = UpperCorners.Num() - 1; k >= 1; k--)
-							{
-								UpperCorners[k] = UpperCorners[k - 1];
-							}
-							UpperCorners[0] = UpperLastElement;
-						}
-					}
-					break;
-				}
-			}
-		}
-		if(LowerCorners[0] != 0)
-		{
-			const int RotationAmount = 4 - LowerCorners[0];
-			Cell.RotationAmount = RotationAmount;
-			for(int j = 0; j < LowerCorners.Num(); j++)
-			{
-				LowerCorners[j] = (LowerCorners[j] + RotationAmount) % 4;
-			}
-			
-			for(int j = 0; j < UpperCorners.Num(); j++)
-			{
-				UpperCorners[j] = (UpperCorners[j] + RotationAmount) % 4 + 4;
-			}
-		}
-	}
-	if(UpperCorners.Num() && (!LowerCorners.Num() || LowerCorners.Num() == 4))
-	{
-		if(UpperCorners.Num() >= 2)
-		{
-			for(int j = 0; j < UpperCorners.Num() - 1; j++)
-			{
-				if(UpperCorners[j] != UpperCorners[j + 1] - 1)
-				{
-					for(int p = 0; p < UpperCorners.Num() - j - 1; p++)
-					{
-						const int LastElement = UpperCorners.Last();
-						for(int k = UpperCorners.Num() - 1; k >= 1; k--)
-						{
-							UpperCorners[k] = UpperCorners[k - 1];
-						}
-						UpperCorners[0] = LastElement;
-					}
-					break;
-				}
-			}
-		}
-		if(UpperCorners[0] != 4)
-		{
-			const int RotationAmount = 8 - UpperCorners[0];
-			Cell.RotationAmount = RotationAmount;
-			for(int j = 0; j < UpperCorners.Num(); j++)
-			{
-				UpperCorners[j] = (UpperCorners[j] + RotationAmount) % 4 + 4;
-			}
-		}
-	}
 
-	Cell.MarchingBits = LowerCorners;
-	Cell.MarchingBits.Append(UpperCorners);
+	UMeshProcessingLibrary::NormalizeMarchingBits(Cell.MarchingBits, Cell.RotationAmount);
+	
+	//if(LowerCorners.Num())
+	//{
+	//	//Arranging so the first lower corner is the least number
+	//	if(LowerCorners.Num() >= 2)
+	//	{
+	//		for(int j = 0; j < LowerCorners.Num() - 1; j++)
+	//		{
+	//			if(LowerCorners[j] != LowerCorners[j + 1] - 1)
+	//			{
+	//				for(int p = 0; p < LowerCorners.Num() - j - 1; p++)
+	//				{
+	//					const int LastElement = LowerCorners.Last();
+	//					for(int k = LowerCorners.Num() - 1; k >= 1; k--)
+	//					{
+	//						LowerCorners[k] = LowerCorners[k - 1];
+	//					}
+	//					LowerCorners[0] = LastElement;
+	//					
+	//					if(UpperCorners.Num() >= 2)
+	//					{
+	//						const int UpperLastElement = UpperCorners.Last();
+	//						for(int k = UpperCorners.Num() - 1; k >= 1; k--)
+	//						{
+	//							UpperCorners[k] = UpperCorners[k - 1];
+	//						}
+	//						UpperCorners[0] = UpperLastElement;
+	//					}
+	//				}
+	//				break;
+	//			}
+	//		}
+	//	}
+	//	if(LowerCorners[0] != 0)
+	//	{
+	//		const int RotationAmount = 4 - LowerCorners[0];
+	//		Cell.RotationAmount = RotationAmount;
+	//		for(int j = 0; j < LowerCorners.Num(); j++)
+	//		{
+	//			LowerCorners[j] = (LowerCorners[j] + RotationAmount) % 4;
+	//		}
+	//		
+	//		for(int j = 0; j < UpperCorners.Num(); j++)
+	//		{
+	//			UpperCorners[j] = (UpperCorners[j] + RotationAmount) % 4 + 4;
+	//		}
+	//	}
+	//}
+	//if(UpperCorners.Num() && (!LowerCorners.Num() || LowerCorners.Num() == 4))
+	//{
+	//	if(UpperCorners.Num() >= 2)
+	//	{
+	//		for(int j = 0; j < UpperCorners.Num() - 1; j++)
+	//		{
+	//			if(UpperCorners[j] != UpperCorners[j + 1] - 1)
+	//			{
+	//				for(int p = 0; p < UpperCorners.Num() - j - 1; p++)
+	//				{
+	//					const int LastElement = UpperCorners.Last();
+	//					for(int k = UpperCorners.Num() - 1; k >= 1; k--)
+	//					{
+	//						UpperCorners[k] = UpperCorners[k - 1];
+	//					}
+	//					UpperCorners[0] = LastElement;
+	//				}
+	//				break;
+	//			}
+	//		}
+	//	}
+	//	if(UpperCorners[0] != 4)
+	//	{
+	//		const int RotationAmount = 8 - UpperCorners[0];
+	//		Cell.RotationAmount = RotationAmount;
+	//		for(int j = 0; j < UpperCorners.Num(); j++)
+	//		{
+	//			UpperCorners[j] = (UpperCorners[j] + RotationAmount) % 4 + 4;
+	//		}
+	//	}
+	//}
+//
+	//Cell.MarchingBits = LowerCorners;
+	//Cell.MarchingBits.Append(UpperCorners);
 }
 
 TArray<FCell*> AGridGenerator::GetCellsToCheck(const int Elevation, const int MarchingBitUpdated)
@@ -1448,12 +1452,13 @@ bool AGridGenerator::PropagateChoice(TArray<FCell>& Cells, const FCell& UpdatedC
 
 bool AGridGenerator::SolveWVC(TArray<FCell*>& OriginalCells, TArray<FCell>& CopyCells, TArray<int> CellOrder)
 {
-	int LowestEntropy = GetLowestEntropyCell(CopyCells);
+	int HighestPriorityCandidate = -1;
+	int LowestEntropy = GetLowestEntropyCell(CopyCells, HighestPriorityCandidate);
 	UE_LOG(LogTemp, Log, TEXT("00000000000000000000000000000000000000000000"));
 	while(LowestEntropy != -1)
     {
     	CellOrder.Add(LowestEntropy);
-	    const int CandidateChosen = FMath::RandRange(0, CopyCells[LowestEntropy].Candidates.Num() - 1);
+	    const int CandidateChosen = HighestPriorityCandidate;
     	CopyCells[LowestEntropy].ChosenCandidate = CopyCells[LowestEntropy].Candidates[CandidateChosen];
     	const TArray<int> CandidateBorders = CopyCells[LowestEntropy].CandidateBorders[CandidateChosen];
 
@@ -1480,7 +1485,7 @@ bool AGridGenerator::SolveWVC(TArray<FCell*>& OriginalCells, TArray<FCell>& Copy
     	{
     		break;
     	}
-		LowestEntropy = GetLowestEntropyCell(CopyCells);
+		LowestEntropy = GetLowestEntropyCell(CopyCells, HighestPriorityCandidate);
     	//CopyBuildingCells[LowestEntropy]->ChosenMesh = true;
     }
 
@@ -1630,23 +1635,45 @@ void AGridGenerator::CreateCellMeshes(const TArray<FCell*>& Cells)
 	}
 }
 
-int AGridGenerator::GetLowestEntropyCell(const TArray<FCell>& Cells)
+int AGridGenerator::GetLowestEntropyCell(const TArray<FCell>& Cells, int& HighestPriorityCandidate)
 {
 	if(!Cells.Num())
 		return -1;
-	int LowestEntropyIndex = -1;
+	TArray<int> LowestEntropyCellIndices;
 	int LowestEntropy = 9999999;
 	for(int i = 0; i < Cells.Num(); i++)
 	{
-		if(1 < Cells[i].Candidates.Num() && Cells[i].Candidates.Num() < LowestEntropy)
+		if(Cells[i].Candidates.Num() == LowestEntropy)
+		{
+			LowestEntropyCellIndices.Add(i);
+		}
+		else if(1 < Cells[i].Candidates.Num() && Cells[i].Candidates.Num() < LowestEntropy)
 		{
 			LowestEntropy = Cells[i].Candidates.Num();
-			LowestEntropyIndex = i;
+			LowestEntropyCellIndices.Empty();
+			LowestEntropyCellIndices.Add(i);
 		}
 	}
-	if(LowestEntropy <= 1)
+	if(LowestEntropy <= 1 || !LowestEntropyCellIndices.Num())
 		return -1;
-	return LowestEntropyIndex;
+	int HighestPriorityCell = 0;
+	int HighestPriority = -1;
+	for(int i = 0; i < LowestEntropyCellIndices.Num(); i++)
+	{
+		for(int j = 0; j < Cells[LowestEntropyCellIndices[i]].Candidates.Num(); j++)
+		{
+			const FBuildingMeshData* CandidateRow = MeshTable->FindRow<FBuildingMeshData>(Cells[LowestEntropyCellIndices[i]].Candidates[j], TEXT("Get Lowest Entropy"));
+			if(!CandidateRow)
+				continue;
+			if(CandidateRow->Priority > HighestPriority)
+			{
+				HighestPriority = CandidateRow->Priority;
+				HighestPriorityCell = LowestEntropyCellIndices[i];
+				HighestPriorityCandidate = j;
+			}
+		}
+	}
+	return HighestPriorityCell;
 }
 
 bool AGridGenerator::CheckNeighbourCandidates(const FCell& Cell, FCell& NeighbourCell, const int CellBorderIndex,
